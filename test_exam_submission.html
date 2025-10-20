@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Exam Submission Event</title>
+</head>
+<body>
+    <h1>Test de l'événement examSubmitted</h1>
+    <button onclick="triggerExamSubmitted()">Déclencher l'événement examSubmitted</button>
+    <div id="logs"></div>
+
+    <script>
+        function log(message) {
+            const logs = document.getElementById('logs');
+            logs.innerHTML += '<div>' + new Date().toLocaleTimeString() + ': ' + message + '</div>';
+        }
+
+        // Écouter l'événement examSubmitted
+        window.addEventListener('examSubmitted', function(event) {
+            log('🎯 Événement examSubmitted reçu: ' + JSON.stringify(event.detail));
+        });
+
+        function triggerExamSubmitted() {
+            log('🚀 Déclenchement de l\'événement examSubmitted...');
+            
+            const event = new CustomEvent('examSubmitted', {
+                detail: {
+                    certificationType: 'initiation_pratique_generale',
+                    moduleId: 'leadership',
+                    score: 1,
+                    maxScore: 1
+                }
+            });
+            
+            window.dispatchEvent(event);
+            log('✅ Événement examSubmitted déclenché');
+        }
+
+        log('📡 Écouteur d\'événement examSubmitted configuré');
+    </script>
+</body>
+</html>
