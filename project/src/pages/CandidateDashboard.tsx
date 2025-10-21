@@ -50,6 +50,12 @@ export const CandidateDashboard: React.FC = () => {
     setShowPayment(false);
     // Mise à jour du statut utilisateur
     user.hasPaid = true;
+    // Rediriger vers les conditions d'examen avant la sélection des modules
+    if (selectedCertification) {
+      navigate(`/exam-conditions?cert=${encodeURIComponent(selectedCertification)}`);
+    } else {
+      navigate('/exam-conditions');
+    }
   };
 
   const handleCertificationSelect = (certification: any) => {

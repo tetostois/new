@@ -23,6 +23,7 @@ export function mapBackendQuestionToFrontend(q: BackendQuestion): Question {
     options: Array.isArray(q.answer_options) ? q.answer_options : undefined,
     points: Number(q.points ?? 1),
     category: 'exam',
+    timeLimit: Number((q as any).time_limit ?? 60),
   };
 }
 

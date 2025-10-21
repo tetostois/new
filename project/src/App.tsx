@@ -10,6 +10,7 @@ import { AdminDashboard } from './pages/AdminDashboard';
 import { ExamInterface } from './components/exam/ExamInterface';
 import APropos from './pages/APropos';
 import ModulePayment from './pages/ModulePayment';
+import ExamConditions from './pages/ExamConditions';
 
 const AppContent: React.FC = () => {
   const { user } = useAuth();
@@ -49,6 +50,7 @@ const AppContent: React.FC = () => {
           <>
             <Route path="/candidate-dashboard" element={<CandidateDashboard />} />
             <Route path="/module-payment" element={<ModulePayment />} />
+            <Route path="/exam-conditions" element={<ExamConditions />} />
             <Route path="/" element={<CandidateDashboard />} />
           </>
         )}

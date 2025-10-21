@@ -72,6 +72,7 @@ export interface Question {
   correctAnswer?: string | number;
   points: number;
   category: string; // Plus flexible pour différentes catégories
+  timeLimit?: number; // en secondes (provenant de backend time_limit)
 }
 
 export interface ExamSubmission {

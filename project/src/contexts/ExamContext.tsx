@@ -86,7 +86,8 @@ export const ExamProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             ? raw.answer_options.map((o: any) => String(o.text ?? o.label ?? ''))
             : undefined,
           points: Number(raw.points ?? 1),
-          category: String(raw.module ?? raw.category ?? moduleId)
+          category: String(raw.module ?? raw.category ?? moduleId),
+          timeLimit: Number(raw.time_limit ?? raw.timeLimit ?? 60)
         } as Question;
       });
 
@@ -150,7 +151,8 @@ export const ExamProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             ? raw.answer_options.map((o: any) => String(o.text ?? o.label ?? ''))
             : undefined,
           points: Number(raw.points ?? 1),
-          category: String(raw.module ?? raw.category ?? 'général')
+          category: String(raw.module ?? raw.category ?? 'général'),
+          timeLimit: Number(raw.time_limit ?? raw.timeLimit ?? 60)
         } as Question;
       });
 

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { ChevronLeft, ChevronRight, Send, AlertCircle } from 'lucide-react';
 import { useExam } from '../../contexts/ExamContext';
 import { useAuth } from '../../contexts/AuthContext';
@@ -13,11 +13,16 @@ export const ExamInterface: React.FC = () => {
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [showSubmitModal, setShowSubmitModal] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [perQuestionTimeLeft, setPerQuestionTimeLeft] = useState<number>(0);
+  const [timerReady, setTimerReady] = useState<boolean>(false);
+  const autoAdvancedIndexRef = useRef<number | null>(null);
+  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   if (!currentExam || !user) return null;
 
   const currentQuestion = currentExam.questions[currentQuestionIndex];
   const currentAnswer = currentAnswers.find(a => a.questionId === currentQuestion.id)?.value;
+  const totalQuestions = currentExam.questions.length;
   
   const handleAnswerChange = (answer: string | number) => {
     submitAnswer(currentQuestion.id, answer);
@@ -43,8 +48,66 @@ export const ExamInterface: React.FC = () => {
   };
 
   const answeredQuestions = currentAnswers.length;
-  const totalQuestions = currentExam.questions.length;
   const progressPercentage = (answeredQuestions / totalQuestions) * 100;
+
+  // Avancer automatiquement à la question suivante quand le temps est écoulé
+  const moveToNextQuestion = async () => {
+    // Stop current interval to éviter multi-déclenchements
+    if (intervalRef.current) {
+      clearInterval(intervalRef.current);
+      intervalRef.current = null;
+    }
+    if (currentQuestionIndex >= totalQuestions - 1) {
+      setIsSubmitting(true);
+      try {
+        await submitExam();
+      } finally {
+        setIsSubmitting(false);
+      }
+      return;
+    }
+    // Décaler à la prochaine frame pour éviter les courses avec setState du timer
+    setTimeout(() => {
+      setCurrentQuestionIndex(prev => (prev < totalQuestions - 1 ? prev + 1 : prev));
+    }, 0);
+  };
+
+  // Initialiser le temps alloué pour la question courante
+  useEffect(() => {
+    const defaultSeconds = Number(currentQuestion.timeLimit ?? 60);
+    setTimerReady(false);
+    setPerQuestionTimeLeft(defaultSeconds > 0 ? defaultSeconds : 60);
+    // Autoriser un nouvel auto-avancement uniquement pour cet index
+    autoAdvancedIndexRef.current = null;
+    // Activer le timer dans une nouvelle frame pour éviter un double saut
+    const ready = setTimeout(() => setTimerReady(true), 0);
+    return () => clearTimeout(ready);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentQuestionIndex]);
+
+  // Décrément du timer par question (tick indépendant, contrôle au tick)
+  useEffect(() => {
+    if (!timerReady) return;
+    const t = setInterval(() => {
+      setPerQuestionTimeLeft(prev => {
+        if (prev <= 1) {
+          // À l'expiration, avancer une seule fois
+          if (autoAdvancedIndexRef.current !== currentQuestionIndex) {
+            autoAdvancedIndexRef.current = currentQuestionIndex;
+            void moveToNextQuestion();
+          }
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+    intervalRef.current = t;
+    return () => {
+      clearInterval(t);
+      intervalRef.current = null;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentQuestionIndex, timerReady]);
 
   return (
     <div className="min-h-screen bg-gray-50 py-6">
@@ -85,6 +148,7 @@ export const ExamInterface: React.FC = () => {
           totalQuestions={totalQuestions}
           currentAnswer={currentAnswer}
           onAnswerChange={handleAnswerChange}
+          timeLeft={perQuestionTimeLeft}
         />
 
         {/* Navigation */}
@@ -92,7 +156,7 @@ export const ExamInterface: React.FC = () => {
           <Button
             variant="secondary"
             onClick={handlePrevious}
-            disabled={currentQuestionIndex === 0}
+            disabled={true}
             className="flex items-center space-x-2"
           >
             <ChevronLeft className="h-4 w-4" />
@@ -115,7 +179,7 @@ export const ExamInterface: React.FC = () => {
             </Button>
           ) : (
             <Button
-              onClick={handleNext}
+              onClick={moveToNextQuestion}
               className="flex items-center space-x-2"
             >
               <span>Suivant</span>
@@ -131,14 +195,17 @@ export const ExamInterface: React.FC = () => {
             {currentExam.questions.map((_, index) => {
               const isAnswered = currentAnswers.some(a => a.questionId === currentExam.questions[index].id);
               const isCurrent = index === currentQuestionIndex;
-              
+              const isDisabled = index !== currentQuestionIndex;
               return (
                 <button
                   key={index}
-                  onClick={() => setCurrentQuestionIndex(index)}
+                  onClick={() => { if (!isDisabled) setCurrentQuestionIndex(index); }}
+                  disabled={isDisabled}
                   className={`w-10 h-10 rounded-lg text-sm font-medium transition-colors ${
                     isCurrent
                       ? 'bg-blue-600 text-white'
+                      : isDisabled
+                      ? 'bg-gray-100 text-gray-400'
                       : isAnswered
                       ? 'bg-green-100 text-green-800 hover:bg-green-200'
                       : 'bg-gray-100 text-gray-600 hover:bg-gray-200'

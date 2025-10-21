@@ -76,6 +76,12 @@ export const QuestionCard: React.FC<QuestionCardProps> = ({
         <h3 className="text-lg font-medium text-gray-900 leading-relaxed mb-4">
           {question.text}
         </h3>
+        {question.timeLimit !== undefined && (
+          <div className="flex items-center text-xs text-gray-500">
+            <Clock className="h-3 w-3 mr-1" />
+            Temps alloué: {Math.ceil((question.timeLimit || 0) / 60)} min
+          </div>
+        )}
       </div>
 
       {question.type === 'multiple-choice' && question.options && (
