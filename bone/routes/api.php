@@ -10,10 +10,14 @@ use App\Http\Controllers\Api\Admin\ExamSubmissionController as AdminExamSubmissi
 use App\Http\Controllers\Api\Examiner\ExamSubmissionController as ExaminerExamSubmissionController;
 use App\Http\Controllers\Api\Candidate\ModuleProgressController;
 use App\Http\Controllers\Api\Candidate\ExamSubmissionController;
+use App\Http\Controllers\Api\Payment\CamPayController;
+use App\Http\Controllers\Api\EmailVerificationController;
 
 // Routes publiques (sans authentification)
 Route::post('/auth/register', [AuthController::class, 'register']);
 Route::post('/auth/login', [AuthController::class, 'login'])->middleware('throttle:5,1');
+// Renvoyer l'email de vérification (protégé, mais accessible même si non vérifié)
+Route::post('/auth/email/resend', [EmailVerificationController::class, 'resend'])->middleware(['auth:api', 'throttle:6,1']);
 
 // Activités récentes (publiques ou protégées selon les besoins)
 Route::get('/activities/recent', [\App\Http\Controllers\Api\ActivityController::class, 'recent']);
@@ -21,6 +25,9 @@ Route::get('/activities/recent', [\App\Http\Controllers\Api\ActivityController::
 // Bootstrap: permettre la création du tout premier admin sans auth.
 // La méthode createAdmin elle-même refusera si un admin existe déjà.
 Route::post('/admin/users/create-admin', [AdminUserController::class, 'createAdmin']);
+
+// Paiement CamPay: initiation publique (pas besoin d'auth pour obtenir l'URL de redirection)
+Route::post('/mobile/campay/initiate', [CamPayController::class, 'initiate']);
 
 // Routes protégées par JWT (guard api)
 // Routes pour les candidats

@@ -64,14 +64,23 @@ class AuthController extends Controller
                 'is_active'      => true,
             ]);
 
+            // Envoyer l'email de vérification
+            try {
+                $user->sendEmailVerificationNotification();
+            } catch (\Throwable $e) {
+                // Ne pas échouer l'inscription si l'envoi échoue ; remonter en debug seulement
+            }
+
+            // Connexion immédiate (JWT) pour permettre au frontend d'appeler l'endpoint de renvoi si besoin
             $token = auth('api')->login($user);
 
             return response()->json([
-                'message'      => 'Inscription réussie',
+                'message'      => 'Inscription réussie. Un email de vérification a été envoyé.',
                 'access_token' => $token,
                 'token_type'   => 'bearer',
                 'expires_in'   => auth('api')->factory()->getTTL() * 60,
                 'user'         => $user,
+                'must_verify_email' => true,
             ], 201);
         } catch (Throwable $e) {
             return response()->json([

@@ -59,3 +59,73 @@ If you discover a security vulnerability within Laravel, please send an e-mail t
 ## License
 
 The Laravel framework is open-sourced software licensed under the [MIT license](https://opensource.org/licenses/MIT).
+
+## Vérification d'email (Papercut en dev, turboSMTP en prod)
+
+Ce projet envoie un email de vérification à l'inscription des candidats. En développement, utilisez Papercut SMTP pour capturer les emails localement; en production, utilisez turboSMTP pour l'envoi réel.
+
+### Endpoints API et web
+
+- POST `/api/auth/register`: crée le compte et envoie l'email de vérification.
+- POST `/api/auth/email/resend` (JWT requis): renvoie l'email de vérification (throttle 6/min).
+- GET `/email/verify/{id}/{hash}` (signé): marque l'email comme vérifié; supporte un paramètre `redirect` optionnel pour rediriger vers le frontend, ex. `?redirect=https://app.exemple.com/verified`.
+
+### Configuration en développement (Papercut SMTP)
+
+1. Installer Papercut SMTP: `https://www.papercut-smtp.com/` (application desktop).
+2. Lancer Papercut, qui écoute par défaut en local (port 25/2525).
+3. Dans `.env` du projet Laravel (`bone/.env`):
+
+```env
+APP_URL=http://localhost
+
+MAIL_MAILER=smtp
+MAIL_HOST=127.0.0.1
+MAIL_PORT=2525
+MAIL_USERNAME=null
+MAIL_PASSWORD=null
+MAIL_SCHEME=
+MAIL_FROM_ADDRESS="no-reply@local.test"
+MAIL_FROM_NAME="Programme Leadership"
+MAIL_EHLO_DOMAIN=localhost
+```
+
+Les emails apparaîtront dans l'interface de Papercut, sans être envoyés réellement.
+
+### Configuration en production (turboSMTP)
+
+Renseignez les identifiants fournis par turboSMTP. Hôte recommandé: `pro.turbo-smtp.com`. Ports: `587` (STARTTLS) ou `465` (SSL).
+
+```env
+APP_URL=https://votre-domaine.com
+
+MAIL_MAILER=smtp
+MAIL_HOST=pro.turbo-smtp.com
+MAIL_PORT=587
+MAIL_USERNAME=VOTRE_UTILISATEUR_TURBOSMTP
+MAIL_PASSWORD=VOTRE_MOTDEPASSE_TURBOSMTP
+MAIL_SCHEME=tls
+MAIL_FROM_ADDRESS="no-reply@votre-domaine.com"
+MAIL_FROM_NAME="Programme Leadership"
+MAIL_EHLO_DOMAIN=votre-domaine.com
+```
+
+Si vous utilisez SSL implicite, remplacez:
+
+```env
+MAIL_PORT=465
+MAIL_SCHEME=ssl
+```
+
+### Tests rapides
+
+1. Démarrer Papercut (en dev) ou configurer turboSMTP (en prod).
+2. Appeler `POST /api/auth/register` avec un email réel.
+3. Ouvrir l'email dans Papercut (ou votre boîte de réception en prod) et cliquer le lien de vérification.
+4. Optionnel: ajouter `?redirect=https://votre-frontend/verified` pour rediriger après succès.
+5. En cas de perte de l'email: `POST /api/auth/email/resend` avec le Bearer token.
+
+### (Optionnel) Protéger des routes par email vérifié
+
+Vous pouvez exiger un email vérifié sur des routes protégées en ajoutant le middleware `verified` aux groupes utilisant déjà `auth:api`.
+

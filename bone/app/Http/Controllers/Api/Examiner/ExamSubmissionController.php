@@ -117,18 +117,37 @@ class ExamSubmissionController extends Controller
                                         ->where('status', 'under_review')
                                         ->firstOrFail();
 
+            // Plafonner chaque note au nombre de points de la question
+            // Extraire certification_type et module_id depuis exam_id
+            preg_match('/^exam-(.*?)-(.*?)$/', $submission->exam_id, $matches);
+            $certificationType = $matches[1] ?? null;
+            $moduleId = $matches[2] ?? null;
+
+            // Récupérer les points par question pour ce couple certification/module
+            $questionsById = ExamQuestion::where('certification_type', $certificationType)
+                                         ->where('module', $moduleId)
+                                         ->pluck('points', 'id');
+
             $examinerNotes = [];
+            $computedTotal = 0;
             foreach ($validated['grades'] as $grade) {
-                $examinerNotes[$grade['question_id']] = [
-                    'score' => $grade['score'],
+                $questionId = (int) $grade['question_id'];
+                $maxPoints = (int) ($questionsById[$questionId] ?? 0);
+                $rawScore = (int) $grade['score'];
+                $cappedScore = max(0, min($rawScore, $maxPoints));
+
+                $examinerNotes[$questionId] = [
+                    'score' => $cappedScore,
                     'feedback' => $grade['feedback'] ?? null,
                 ];
+                $computedTotal += $cappedScore;
             }
 
             $submission->update([
                 'status' => 'graded',
                 'graded_at' => now(),
-                'total_score' => $validated['total_score'],
+                // Utiliser le total calculé et plafonné côté serveur
+                'total_score' => $computedTotal,
                 'examiner_notes' => $examinerNotes, // Stocker les notes de l'examinateur
             ]);
 
@@ -138,7 +157,8 @@ class ExamSubmissionController extends Controller
                                                        ->first();
             if ($moduleProgress) {
                 $moduleProgress->update([
-                    'score' => $validated['total_score'],
+                    // Synchroniser avec le total plafonné
+                    'score' => $computedTotal,
                     'status' => 'completed', // Le module est considéré comme complété après notation
                 ]);
             }

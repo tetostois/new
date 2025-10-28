@@ -144,8 +144,9 @@ export const ExaminerDashboard: React.FC = () => {
   const allSubmissions = Object.values(submissions).flat();
   const correctedSubmissions = allSubmissions.filter(s => s.status === 'graded');
 
-  const handleScoreChange = (questionId: string, score: number) => {
-    setScores(prev => ({ ...prev, [questionId]: score }));
+  const handleScoreChange = (questionId: string, score: number, maxPoints?: number) => {
+    const safeScore = Math.max(0, Math.min(score, typeof maxPoints === 'number' ? maxPoints : score));
+    setScores(prev => ({ ...prev, [questionId]: safeScore }));
   };
 
   const handleFeedbackChange = (questionId: string, text: string) => {
@@ -601,8 +602,8 @@ export const ExaminerDashboard: React.FC = () => {
                               type="number"
                               min="0"
                               max={qa.points_possible}
-                              value={scores[qa.question_id] || ''}
-                              onChange={(e) => handleScoreChange(qa.question_id, parseInt(e.target.value) || 0)}
+                              value={scores[qa.question_id] ?? ''}
+                              onChange={(e) => handleScoreChange(qa.question_id, parseInt(e.target.value) || 0, qa.points_possible)}
                               className="w-20"
                             />
                             <span className="text-gray-600">/ {qa.points_possible}</span>

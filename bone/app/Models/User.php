@@ -5,10 +5,11 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
+use Illuminate\Contracts\Auth\MustVerifyEmail as MustVerifyEmailContract;
 use Tymon\JWTAuth\Contracts\JWTSubject;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
-class User extends Authenticatable implements JWTSubject
+class User extends Authenticatable implements JWTSubject, MustVerifyEmailContract
 {
     use HasFactory, Notifiable;
 
@@ -170,13 +171,7 @@ class User extends Authenticatable implements JWTSubject
         return $this->role === self::ROLE_CANDIDATE;
     }
 
-    /**
-     * Relation avec les examens créés (pour les administrateurs)
-     */
-    public function createdExams()
-    {
-        return $this->hasMany(Exam::class, 'created_by');
-    }
+    // Supprimé: relation createdExams car le modèle Exam n'existe pas
 
     /**
      * Relation avec les soumissions d'examen (pour les candidats)
@@ -231,6 +226,10 @@ class User extends Authenticatable implements JWTSubject
      */
     public function certificates()
     {
+        // Sécuriser l'appel si la classe n'existe pas dans le projet
+        if (!class_exists(\App\Models\Certificate::class, false)) {
+            return $this->hasMany(self::class)->whereRaw('1 = 0');
+        }
         return $this->hasMany(Certificate::class);
     }
 
@@ -239,6 +238,10 @@ class User extends Authenticatable implements JWTSubject
      */
     public function payments()
     {
+        // Sécuriser l'appel si la classe n'existe pas dans le projet
+        if (!class_exists(\App\Models\Payment::class, false)) {
+            return $this->hasMany(self::class)->whereRaw('1 = 0');
+        }
         return $this->hasMany(Payment::class);
     }
 
@@ -291,9 +294,12 @@ class User extends Authenticatable implements JWTSubject
     public function canBeDeleted()
     {
         // Empêcher la suppression si l'utilisateur a des relations importantes
-        return !$this->createdExams()->exists() &&
-               !$this->examSubmissions()->exists() &&
-               !$this->assignedSubmissions()->exists() &&
-               !$this->certificates()->exists();
+        $hasExamSubmissions = $this->examSubmissions()->exists();
+        $hasAssignedSubmissions = $this->assignedSubmissions()->exists();
+        $hasCertificates = false;
+        if (class_exists(\App\Models\Certificate::class, false)) {
+            $hasCertificates = $this->certificates()->exists();
+        }
+        return !$hasExamSubmissions && !$hasAssignedSubmissions && !$hasCertificates;
     }
 }

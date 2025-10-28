@@ -3,14 +3,10 @@ import { ToastContainer, toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import { useAuth } from '../contexts/AuthContext';
 import { 
-  Users, UserPlus, FileText, Settings, LogOut, CheckCircle, Clock, Search, 
-  Filter, ChevronDown, Plus, Download, Upload, Eye, Edit, Trash2, X, Check, 
-  ChevronLeft, ChevronRight, MoreVertical, Calendar, Clock as ClockIcon, 
-  AlertCircle, BarChart2, CreditCard, File, UserCheck, UserX, Mail, Phone, 
-  Home, MapPin, Hash, Award, BookOpen, Book, BookMarked, BookOpenCheck, 
-  BookKey, BookLock, BookMarkedCheck, BookMarkedX, BookMarkedMinus, 
-  BookMarkedPlus, BookPlus, BookMinus, BookX, BookCheck, BookOpenText, 
-  BookOpenTextIcon, BookTemplate, BookUp, BookDown, BookUp2, BookDown2, HelpCircle
+  Users, UserPlus, FileText, Settings, CheckCircle, Clock, Search, 
+  Plus, Download, Eye, Edit, Trash2, X, 
+  AlertCircle, BarChart2, CreditCard, UserCheck, Mail, 
+  Award, HelpCircle
 } from 'lucide-react';
 import { Input } from '../components/ui/Input';
 import { Card } from '../components/ui/Card';
@@ -184,6 +180,7 @@ export const AdminDashboard: React.FC = () => {
 
   // API base and helpers
   const API_BASE = (import.meta as any)?.env?.VITE_API_BASE_URL || 'http://127.0.0.1:8000/api';
+  const SITE_BASE = API_BASE.replace(/\/api$/, '');
   const getToken = () => localStorage.getItem('token') || '';
   const normalizeUserFromBackend = (raw: any): User => ({
     id: String(raw.id ?? raw.uuid ?? ''),
@@ -556,9 +553,9 @@ export const AdminDashboard: React.FC = () => {
       
       alert(`${body.published_count || questionIds.length} questions publiées avec succès pour le module ${module}`);
       
-    } catch (e) {
+    } catch (e: any) {
       console.error('Erreur lors de la publication :', e);
-      alert(`Erreur lors de la publication : ${e.message}`);
+      alert(`Erreur lors de la publication : ${e?.message || 'Erreur inconnue'}`);
     }
   };
 
@@ -633,9 +630,9 @@ export const AdminDashboard: React.FC = () => {
       alert(`Examen publié avec succès ! ${result.published_count} questions publiées.`);
       setShowPublishModal(false);
       
-    } catch (error) {
+    } catch (error: any) {
       console.error('Erreur lors de la publication:', error);
-      alert(`Erreur lors de la publication: ${error.message}`);
+      alert(`Erreur lors de la publication: ${error?.message || 'Erreur inconnue'}`);
     }
   };
   
@@ -664,14 +661,40 @@ export const AdminDashboard: React.FC = () => {
   };
   
   // Fonction pour soumettre une correction
-  const submitGrading = (submissionId: string, grades: Record<string, { score: number; feedback: string }>) => {
+  const submitGrading = async (submissionId: string, grades: Record<string, { score: number; feedback: string }>) => {
     const now = new Date().toISOString();
-    
-    // Update submission with grades
+    const totalScoreRaw = Object.values(grades).reduce((sum, { score }) => sum + (Number(score) || 0), 0);
+    const totalScore = Math.round(totalScoreRaw);
+    const payload = {
+      grades: Object.entries(grades).map(([questionId, g]) => ({
+        question_id: questionId,
+        score: Math.round(Number(g.score) || 0),
+        feedback: g.feedback || ''
+      })),
+      total_score: totalScore
+    };
+
+    let syncedWithServer = false;
+    try {
+      const res = await fetch(`${API_BASE}/examiner/exam-submissions/${submissionId}/grade`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${getToken()}`,
+          'Accept': 'application/json'
+        },
+        body: JSON.stringify(payload)
+      });
+      if (res.ok) {
+        syncedWithServer = true;
+      }
+    } catch (e: any) {
+      // fallback local
+    }
+
     setExamSubmissionsState((prev: ExamSubmissionData[]) => 
       prev.map((submission: ExamSubmissionData) => {
         if (submission.id === submissionId) {
-          // Update examiner's assigned exams count if this submission has an examiner
           if (submission.examinerId) {
             setExaminers(prev =>
               prev.map(e =>
@@ -681,19 +704,13 @@ export const AdminDashboard: React.FC = () => {
               )
             );
           }
-          
-          // Calculate total score from grades
-          const totalScore = Object.values(grades).reduce((sum, { score }) => sum + score, 0);
-          
-          // Generate certificate if score is sufficient (70% or higher)
+
           if (totalScore >= 70) {
             const candidate = users.find(u => u.id === submission.candidateId);
             if (candidate) {
               const newCertificate: Certificate = {
                 id: `cert-${Date.now()}`,
                 candidateName: `${candidate.firstName} ${candidate.lastName}`,
-                certificationType: selectedExam?.certificationType || 'initiation_pratique_generale',
-                module: selectedExam?.module || 'leadership',
                 score: totalScore,
                 issuedAt: now,
                 downloadUrl: `/certificates/${candidate.id}-${Date.now()}.pdf`
@@ -701,30 +718,28 @@ export const AdminDashboard: React.FC = () => {
               setCertificates(prev => [...prev, newCertificate]);
             }
           }
-          
-          // Return updated submission with proper typing
+
           const updatedSubmission: ExamSubmissionData = {
             ...submission,
             status: 'graded',
             gradedAt: now,
             totalScore,
-            answers: submission.answers.map(answer => {
-              const grade = grades[answer.questionId];
-              return {
-                ...answer,
-                score: grade?.score,
-                feedback: grade?.feedback || ''
-              };
-            })
+            answers: submission.answers.map(answer => ({
+              ...answer,
+              score: grades[answer.questionId]?.score,
+              feedback: grades[answer.questionId]?.feedback || ''
+            }))
           };
-          
           return updatedSubmission;
         }
         return submission;
       })
     );
-    
-    alert('Correction soumise avec succès.');
+
+    if (typeof toast !== 'undefined') {
+      if (syncedWithServer) toast.success('Correction enregistrée (serveur)');
+      else toast.info('Correction enregistrée localement');
+    }
   };
 
   const [certificates, setCertificates] = useState<Certificate[]>([
@@ -1235,7 +1250,12 @@ export const AdminDashboard: React.FC = () => {
   };
 
   const sendEmailToExaminer = (examiner: Examiner) => {
-    console.log('Email envoyé à:', examiner.email);
+    const subject = encodeURIComponent('Affectation/Information examen');
+    const body = encodeURIComponent(
+      `Bonjour ${examiner.firstName} ${examiner.lastName},\n\n` +
+      `Vous avez des informations relatives aux examens à traiter dans le tableau de bord administrateur.`
+    );
+    window.location.href = `mailto:${examiner.email}?subject=${subject}&body=${body}`;
   };
 
   // Fonction pour assigner un examinateur à une soumission
@@ -1273,13 +1293,25 @@ export const AdminDashboard: React.FC = () => {
   };
 
   const downloadCertificate = (certificate: Certificate) => {
-    console.log('Téléchargement du certificat:', certificate.downloadUrl);
-    alert(`Téléchargement du certificat de ${certificate.candidateName}`);
+    const url = /^https?:\/\//.test(certificate.downloadUrl)
+      ? certificate.downloadUrl
+      : `${SITE_BASE}${certificate.downloadUrl}`;
+    window.open(url, '_blank');
   };
 
   const sendCertificateByEmail = (certificate: Certificate) => {
-    console.log('Certificat envoyé par email:', certificate.candidateName);
-    alert(`Certificat envoyé par email à ${certificate.candidateName}`);
+    const subject = encodeURIComponent('Votre certificat de réussite');
+    const verifyUrl = `${SITE_BASE}/certificates/verify`;
+    const link = /^https?:\/\//.test(certificate.downloadUrl)
+      ? certificate.downloadUrl
+      : `${SITE_BASE}${certificate.downloadUrl}`;
+    const body = encodeURIComponent(
+      `Bonjour ${certificate.candidateName},\n\n` +
+      `Veuillez trouver votre certificat au lien suivant : ${link}\n` +
+      `Vérification publique: ${verifyUrl}\n\n` +
+      `Cordialement.`
+    );
+    window.location.href = `mailto:?subject=${subject}&body=${body}`;
   };
 
   // Fonctions pour la gestion des questions d'examen
@@ -1399,9 +1431,9 @@ export const AdminDashboard: React.FC = () => {
       });
       alert('Question enregistrée avec succès !');
       
-    } catch (error) {
+    } catch (error: any) {
       console.error('Erreur lors de l\'enregistrement :', error);
-      alert(`Erreur lors de l'enregistrement de la question : ${error.message}`);
+      alert(`Erreur lors de l'enregistrement de la question : ${error?.message || 'Erreur inconnue'}`);
     }
   };
 
@@ -2563,16 +2595,18 @@ export const AdminDashboard: React.FC = () => {
                               <input
                                 type="number"
                                 min="0"
-                                max="20"
+                                max={(questions.find(q => q.id === answer.questionId)?.points) ?? 20}
                                 step="0.5"
                                 value={grades[answer.questionId]?.score ?? ''}
                                 onChange={(e) => {
-                                  const score = parseFloat(e.target.value);
+                                  const raw = parseFloat(e.target.value);
+                                  const maxPts = (questions.find(q => q.id === answer.questionId)?.points) ?? 20;
+                                  const score = isNaN(raw) ? 0 : Math.min(maxPts, Math.max(0, raw));
                                   setGrades(prev => ({
                                     ...prev,
                                     [answer.questionId]: {
                                       ...prev[answer.questionId],
-                                      score: isNaN(score) ? 0 : Math.min(20, Math.max(0, score))
+                                      score
                                     }
                                   }));
                                 }}
@@ -2834,7 +2868,7 @@ export const AdminDashboard: React.FC = () => {
                   <input
                     type="hidden"
                     value="admin"
-                    onChange={(e) => setUserForm({...userForm, role: 'admin'})}
+                    onChange={() => setUserForm({...userForm, role: 'admin'})}
                   />
                 </div>
                 <Input
@@ -2859,21 +2893,21 @@ export const AdminDashboard: React.FC = () => {
                     />
                   </>
                 )}
-                {modalMode === 'create' && userForm.role === 'admin' && (
+                {modalMode === 'create' && (
                   <>
                     <Input
                       label="Mot de passe (min 6 caractères)"
                       type="password"
                       value={userForm.password}
                       onChange={(e) => setUserForm({ ...userForm, password: e.target.value })}
-                      disabled={modalMode === 'view'}
+                      disabled={false}
                     />
                     <Input
                       label="Confirmer le mot de passe"
                       type="password"
                       value={userForm.passwordConfirm}
                       onChange={(e) => setUserForm({ ...userForm, passwordConfirm: e.target.value })}
-                      disabled={modalMode === 'view'}
+                      disabled={false}
                     />
                   </>
                 )}
