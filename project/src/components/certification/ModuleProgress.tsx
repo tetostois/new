@@ -189,6 +189,27 @@ export const ModuleProgress: React.FC<ModuleProgressProps> = ({
   };
 
   const timeRemaining = getTimeRemaining();
+  
+  // Progression globale dynamique
+  const totalModules = certification.modules.length;
+  const completedFromBackend = moduleProgress.filter(p => p.status === 'completed').length;
+  const completedFallback = completedModules.length;
+  const completedCount = completedFromBackend > 0 || moduleProgress.length > 0 ? completedFromBackend : completedFallback;
+  const overallPercent = totalModules > 0 ? (completedCount / totalModules) * 100 : 0;
+
+  // Notifier le parent/la page pour faire évoluer la barre de progression globale
+  useEffect(() => {
+    try {
+      const detail = {
+        certificationId: certification.id,
+        completedCount,
+        totalModules
+      };
+      window.dispatchEvent(new CustomEvent('moduleProgressUpdate', { detail }));
+    } catch (e) {
+      // no-op
+    }
+  }, [completedCount, totalModules, certification.id]);
 
   return (
     <div className="space-y-6">
@@ -340,7 +361,7 @@ export const ModuleProgress: React.FC<ModuleProgressProps> = ({
         <div className="flex items-center justify-between mb-4">
           <h3 className="font-semibold text-gray-900">Progression globale</h3>
           <span className="text-sm text-gray-600">
-            {completedModules.length} / {certification.modules.length} modules
+            {completedCount} / {totalModules} modules
           </span>
         </div>
         
@@ -348,12 +369,12 @@ export const ModuleProgress: React.FC<ModuleProgressProps> = ({
           <div
             className="bg-blue-600 h-3 rounded-full transition-all duration-500"
             style={{
-              width: `${(completedModules.length / certification.modules.length) * 100}%`
+              width: `${overallPercent}%`
             }}
           ></div>
         </div>
 
-        {completedModules.length === certification.modules.length && (
+        {completedCount === totalModules && totalModules > 0 && (
           <div className="text-center py-4">
             <CheckCircle className="h-12 w-12 text-green-600 mx-auto mb-3" />
             <h4 className="text-lg font-semibold text-green-800 mb-2">

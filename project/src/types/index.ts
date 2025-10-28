@@ -131,6 +131,8 @@ export interface AuthContextType {
   register: (userData: Partial<User>, password: string) => Promise<boolean>;
   isLoading: boolean;
   getToken: () => string;
+  requireReauth?: boolean;
+  reauthenticate?: (password: string) => Promise<boolean>;
 }
 
 export interface ExamSession {

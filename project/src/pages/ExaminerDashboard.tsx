@@ -28,6 +28,9 @@ export const ExaminerDashboard: React.FC = () => {
     average_score: 0
   });
   
+  // Cache des points max par soumission (pour afficher /20 correctement)
+  const [maxPointsBySubmission, setMaxPointsBySubmission] = useState<Record<string, number>>({});
+  
   const [profileForm, setProfileForm] = useState({
     firstName: user?.firstName || '',
     lastName: user?.lastName || '',
@@ -139,6 +142,32 @@ export const ExaminerDashboard: React.FC = () => {
   useEffect(() => {
     loadSubmissions();
   }, [statusFilter]);
+
+  // Précharger les points maximum des soumissions corrigées (pour normaliser sur 20)
+  useEffect(() => {
+    const all = Object.values(submissions).flat();
+    const graded = all.filter(s => s.status === 'graded');
+    const missing = graded.filter(s => !(s.id in maxPointsBySubmission));
+    if (missing.length === 0) return;
+
+    (async () => {
+      const updates: Record<string, number> = {};
+      for (const sub of missing) {
+        try {
+          const resp = await ExaminerService.getSubmission(sub.id.toString());
+          const pts = Array.isArray(resp.submission?.questions_details)
+            ? resp.submission.questions_details.reduce((sum: number, qa: any) => sum + (qa.points_possible || 0), 0)
+            : 0;
+          if (pts > 0) updates[sub.id] = pts;
+        } catch (e) {
+          // ignorer
+        }
+      }
+      if (Object.keys(updates).length > 0) {
+        setMaxPointsBySubmission(prev => ({ ...prev, ...updates }));
+      }
+    })();
+  }, [submissions, maxPointsBySubmission]);
 
   // Calculer les statistiques à partir des soumissions groupées
   const allSubmissions = Object.values(submissions).flat();
@@ -503,7 +532,12 @@ export const ExaminerDashboard: React.FC = () => {
                               <div className="flex items-center space-x-2">
                                 <Star className="h-3 w-3 text-yellow-500" />
                                 <span className="font-bold text-green-600 text-xs">
-                                  {submission.total_score || 0}/100
+                                  {(() => {
+                                    const maxPts = maxPointsBySubmission[submission.id];
+                                    if (!maxPts || maxPts <= 0) return `${submission.total_score || 0}`;
+                                    const val20 = ((submission.total_score || 0) / maxPts) * 20;
+                                    return `${val20.toFixed(2)}/20`;
+                                  })()}
                                 </span>
                               </div>
                             </div>

@@ -39,6 +39,7 @@ export const CandidateDashboard: React.FC = () => {
     subject: '',
     message: ''
   });
+  const [modulesCompletedCount, setModulesCompletedCount] = useState(0);
 
 
   if (!user) return null;
@@ -103,6 +104,17 @@ export const CandidateDashboard: React.FC = () => {
     setShowPayment(true);
   };
 
+  // Écouter la progression globale depuis ModuleProgress
+  useEffect(() => {
+    const listener = (e: any) => {
+      if (e?.detail?.completedCount !== undefined) {
+        setModulesCompletedCount(e.detail.completedCount);
+      }
+    };
+    window.addEventListener('moduleProgressUpdate', listener);
+    return () => window.removeEventListener('moduleProgressUpdate', listener);
+  }, []);
+
   const saveProfile = () => {
     // Simulation de la sauvegarde
     console.log('Profil mis à jour:', profileForm);
@@ -133,7 +145,7 @@ export const CandidateDashboard: React.FC = () => {
       id: 'exam',
       title: 'Modules',
       description: 'Compléter les 3 modules',
-      completed: user.examTaken || false,
+      completed: modulesCompletedCount >= (currentCertification?.modules.length || 0),
       current: paymentCompleted && !user.examTaken && !isExamActive
     },
     {
@@ -425,6 +437,7 @@ export const CandidateDashboard: React.FC = () => {
             <Card>
               <div className="flex justify-between items-center mb-4">
                 <h3 className="font-semibold text-gray-900">Certification</h3>
+              {!paymentCompleted && (
                 <Button
                   size="sm"
                   variant="secondary"
@@ -432,6 +445,7 @@ export const CandidateDashboard: React.FC = () => {
                 >
                   Changer
                 </Button>
+              )}
               </div>
               {currentCertification && (
                 <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">

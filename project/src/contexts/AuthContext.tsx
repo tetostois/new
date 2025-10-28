@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, ReactNode } from 'react';
+import React, { createContext, useContext, useState, ReactNode, useEffect } from 'react';
 import { User, AuthContextType } from '../types';
 import { API_BASE_URL } from '../config/api';
 
@@ -28,6 +28,7 @@ const clearSession = () => {
 export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [requireReauth, setRequireReauth] = useState(false);
 
   // Normalise les champs utilisateur du backend (snake_case) vers camelCase
   const normalizeUser = (raw: any): User => {
@@ -179,6 +180,51 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     }
   }, []);
 
+  // Détection d'inactivité (5 min) => demande de réauthentification
+  useEffect(() => {
+    let lastActivity = Date.now();
+    let timer: number | undefined;
+
+    const resetTimer = () => {
+      lastActivity = Date.now();
+      if (timer) window.clearTimeout(timer);
+      timer = window.setTimeout(() => {
+        if (Date.now() - lastActivity >= 300000) {
+          setRequireReauth(true);
+        }
+      }, 300000);
+    };
+
+    const events = ['mousemove', 'keydown', 'click', 'scroll', 'touchstart'];
+    events.forEach(evt => window.addEventListener(evt, resetTimer, { passive: true } as any));
+    resetTimer();
+
+    return () => {
+      if (timer) window.clearTimeout(timer);
+      events.forEach(evt => window.removeEventListener(evt, resetTimer as any));
+    };
+  }, []);
+
+  const reauthenticate = async (password: string): Promise<boolean> => {
+    if (!user) return false;
+    try {
+      const res = await fetch(`${API_BASE_URL}/auth/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+        body: JSON.stringify({ email: user.email, password })
+      });
+      if (!res.ok) return false;
+      const data = await res.json();
+      const normalized = normalizeUser(data.user);
+      setSession(data.access_token, normalized);
+      setUser(normalized);
+      setRequireReauth(false);
+      return true;
+    } catch {
+      return false;
+    }
+  };
+
   const value: AuthContextType = {
     user,
     login,
@@ -186,12 +232,40 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     logout,
     isLoading,
     getToken: (): string => getToken() || '',
+    // propriétés d'extension exposées via contexte (cast pour compat TS)
+    ...( { requireReauth, reauthenticate } as Partial<AuthContextType> ),
   };
 
   return (
     <AuthContext.Provider value={value}>
       {children}
+      {requireReauth && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-lg w-full max-w-sm p-6 shadow-lg">
+            <h3 className="text-lg font-semibold mb-4">Session inactive</h3>
+            <p className="text-sm text-gray-600 mb-4">Veuillez saisir votre mot de passe pour continuer.</p>
+            <ReauthForm onSubmit={async (pwd) => { const ok = await reauthenticate(pwd); if (!ok) alert('Mot de passe incorrect'); }} />
+          </div>
+        </div>
+      )}
     </AuthContext.Provider>
+  );
+};
+
+const ReauthForm: React.FC<{ onSubmit: (pwd: string) => void | Promise<void> }> = ({ onSubmit }) => {
+  const [pwd, setPwd] = useState('');
+  return (
+    <form onSubmit={(e) => { e.preventDefault(); onSubmit(pwd); }}>
+      <input
+        type="password"
+        value={pwd}
+        onChange={(e) => setPwd(e.target.value)}
+        placeholder="Mot de passe"
+        className="w-full border rounded px-3 py-2 mb-4"
+        autoFocus
+      />
+      <button type="submit" className="w-full bg-blue-600 text-white rounded px-3 py-2">Valider</button>
+    </form>
   );
 };
 
