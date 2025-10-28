@@ -8,6 +8,8 @@ use App\Models\ExamQuestion;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Storage;
+use Barryvdh\DomPDF\Facade\Pdf;
 
 class ExamSubmissionController extends Controller
 {
@@ -161,6 +163,73 @@ class ExamSubmissionController extends Controller
                     'score' => $computedTotal,
                     'status' => 'completed', // Le module est considéré comme complété après notation
                 ]);
+            }
+
+            // Génération automatique du certificat quand TOUS les modules de la certification
+            // sont corrigés et que la moyenne globale >= 50%
+            preg_match('/^exam-(.*?)-(.*?)$/', $submission->exam_id, $m);
+            $certType = $m[1] ?? null;
+            if ($certType) {
+                // Modules attendus pour cette certification (dérivés des questions publiées)
+                $expectedModules = ExamQuestion::where('certification_type', $certType)
+                    ->distinct()->pluck('module')->toArray();
+
+                // Dernière soumission corrigée par module pour ce candidat et cette certification
+                $gradedSubs = \App\Models\ExamSubmission::where('candidate_id', $submission->candidate_id)
+                    ->where('status', 'graded')
+                    ->where('exam_id', 'like', 'exam-' . $certType . '-%')
+                    ->orderByDesc('graded_at')
+                    ->get();
+
+                $byModule = [];
+                foreach ($gradedSubs as $gs) {
+                    if (preg_match('/^exam-(.*?)-(.*?)$/', $gs->exam_id, $mm)) {
+                        $mod = $mm[2] ?? null;
+                        if ($mod && !isset($byModule[$mod])) {
+                            $byModule[$mod] = $gs; // prendre la plus récente par module
+                        }
+                    }
+                }
+
+                // Vérifier couverture complète
+                $hasAll = !empty($expectedModules) && count(array_intersect($expectedModules, array_keys($byModule))) === count($expectedModules);
+
+                if ($hasAll) {
+                    // Calculer score total et max total sur l'ensemble des modules
+                    $totalScoreAll = 0;
+                    $totalMaxAll = 0;
+                    foreach ($expectedModules as $mod) {
+                        $subm = $byModule[$mod];
+                        $totalScoreAll += (int) ($subm->total_score ?? 0);
+                        $modMax = (int) ExamQuestion::where('certification_type', $certType)
+                            ->where('module', $mod)
+                            ->sum('points');
+                        $totalMaxAll += $modMax;
+                    }
+
+                    // Moyenne sur 20
+                    $avgOutOf20 = $totalMaxAll > 0 ? ($totalScoreAll / $totalMaxAll) * 20 : 0;
+
+                    if ($avgOutOf20 >= 10) {
+                        // Éviter doublons: ne pas régénérer si déjà un fichier pour ce couple
+                        $existing = collect(Storage::disk('public')->files('certificates'))
+                            ->first(function ($f) use ($submission, $certType) {
+                                return str_starts_with(basename($f), $submission->candidate_id . '-' . $certType . '-');
+                            });
+                        if (!$existing) {
+                            $candidate = $submission->candidate;
+                            $data = [
+                                'name' => trim(($candidate->first_name ?? '') . ' ' . ($candidate->last_name ?? '')),
+                                'certification' => $certType,
+                                'date' => now()->format('d/m/Y'),
+                                'id_number' => 'ID-' . strtoupper($certType) . '-' . $submission->candidate_id,
+                            ];
+                            $pdf = Pdf::loadView('certificates.certificate', $data);
+                            $path = 'certificates/' . $submission->candidate_id . '-' . $certType . '-' . now()->format('YmdHis') . '.pdf';
+                            Storage::disk('public')->put($path, $pdf->output());
+                        }
+                    }
+                }
             }
 
             DB::commit();

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { CheckCircle, Clock, CreditCard, FileText, BookOpen, AlertCircle, Download, Play } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
@@ -10,11 +10,13 @@ import { Button } from '../components/ui/Button';
 import { PaymentForm } from '../components/payment/PaymentForm';
 import { Input } from '../components/ui/Input';
 import { getCertificationById } from '../components/data/certifications';
+import { ResultsService } from '../services/resultsService';
+import apiRequest, { API_BASE_URL } from '../config/api';
 
 
 export const CandidateDashboard: React.FC = () => {
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { user, getToken } = useAuth();
   const { startModule, isExamActive } = useExam();
   const [showPayment, setShowPayment] = useState(false);
   const [paymentCompleted, setPaymentCompleted] = useState(user?.hasPaid || false);
@@ -40,6 +42,8 @@ export const CandidateDashboard: React.FC = () => {
     message: ''
   });
   const [modulesCompletedCount, setModulesCompletedCount] = useState(0);
+  const [myCertificates, setMyCertificates] = useState<Array<{ candidate_id: string; candidate_name: string; certification_type: string; url: string; sent_at?: string }>>([]);
+  const [resultsData, setResultsData] = useState<any>(null);
 
 
   if (!user) return null;
@@ -115,6 +119,32 @@ export const CandidateDashboard: React.FC = () => {
     return () => window.removeEventListener('moduleProgressUpdate', listener);
   }, []);
 
+  // Charger les résultats (notes/commentaires) pour affichage de la correction
+  useEffect(() => {
+    (async () => {
+      try {
+        const res = await ResultsService.getResults();
+        if (res?.success) setResultsData(res.results || null);
+      } catch {
+        setResultsData(null);
+      }
+    })();
+  }, []);
+
+  // Charger les certificats envoyés à ce candidat
+  useEffect(() => {
+    (async () => {
+      try {
+        const res: any = await apiRequest('/candidate/certificates', 'GET');
+        if (res?.success && Array.isArray(res.certificates)) {
+          setMyCertificates(res.certificates);
+        }
+      } catch {
+        // silencieux
+      }
+    })();
+  }, []);
+
   const saveProfile = () => {
     // Simulation de la sauvegarde
     console.log('Profil mis à jour:', profileForm);
@@ -132,6 +162,19 @@ export const CandidateDashboard: React.FC = () => {
     setSupportForm({ subject: '', message: '' });
     setShowSupportModal(false);
   };
+
+  const hasCertificates = myCertificates.length > 0;
+  const hasCorrection = !!resultsData || user.score !== undefined;
+
+  const statusInfo = useMemo(() => {
+    if (!paymentCompleted) return { text: 'En attente de paiement', cls: 'text-gray-600' };
+    if (isExamActive) return { text: 'Examen en cours', cls: 'text-blue-600' };
+    if (hasCertificates) return { text: 'Certifié', cls: 'text-green-600' };
+    if (hasCorrection) return { text: 'Correction disponible', cls: 'text-green-600' };
+    if (user.examTaken) return { text: 'En correction', cls: 'text-blue-600' };
+    if (modulesCompletedCount > 0) return { text: 'Modules en cours', cls: 'text-blue-600' };
+    return { text: 'Prêt pour modules', cls: 'text-orange-600' };
+  }, [paymentCompleted, isExamActive, hasCertificates, hasCorrection, user.examTaken, modulesCompletedCount]);
 
   const steps = [
     {
@@ -152,15 +195,15 @@ export const CandidateDashboard: React.FC = () => {
       id: 'correction',
       title: 'Correction',
       description: 'Attendre l\'évaluation',
-      completed: user.score !== undefined,
-      current: user.examTaken === true && user.score === undefined
+      completed: hasCorrection && !!resultsData,
+      current: user.examTaken === true && !hasCorrection
     },
     {
       id: 'certificate',
       title: 'Certification',
       description: 'Récupérer l\'attestation',
-      completed: user.certificate !== undefined,
-      current: user.score !== undefined && user.certificate === undefined
+      completed: hasCertificates,
+      current: hasCorrection && !hasCertificates
     }
   ];
 
@@ -335,46 +378,9 @@ export const CandidateDashboard: React.FC = () => {
               </Card>
             )}
 
-            {paymentCompleted && !user.examTaken && !isExamActive && currentCertification && (
-              <Card>
-                <div className="flex items-start space-x-4">
-                  <div className="p-3 bg-green-100 rounded-lg">
-                    <BookOpen className="h-6 w-6 text-green-600" />
-                  </div>
-                  <div className="flex-1">
-                    <h3 className="text-lg font-semibold text-gray-900 mb-2">
-                      Prêt pour les modules
-                    </h3>
-                    <p className="text-gray-600 mb-4">
-                      Votre paiement a été confirmé. Vous pouvez maintenant commencer les modules de certification.
-                    </p>
-                    <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-4">
-                      <div className="flex items-center space-x-2">
-                        <AlertCircle className="h-5 w-5 text-yellow-600" />
-                        <span className="font-medium text-yellow-800">Important :</span>
-                      </div>
-                      <ul className="text-yellow-700 text-sm mt-2 space-y-1">
-                        <li>• Chaque module dure 60 minutes (20 questions)</li>
-                        <li>• Vous avez 3 jours pour terminer tous les modules</li>
-                        <li>• Assurez-vous d'avoir une connexion internet stable</li>
-                        <li>• Préparez un environnement calme et sans distractions</li>
-                      </ul>
-                    </div>
-                    <div className="flex space-x-3">
-                      <Button onClick={() => handleStartModuleWithPayment(currentCertification.modules[0].id)}>
-                        <Play className="h-4 w-4 mr-2" />
-                        Commencer le premier module
-                      </Button>
-                      <Button onClick={() => setShowExamInstructions(true)} variant="secondary">
-                        Voir les instructions
-                      </Button>
-                    </div>
-                  </div>
-                </div>
-              </Card>
-            )}
+            
 
-            {user.examTaken && !user.score && (
+            {user.examTaken && !hasCorrection && (
               <Card>
                 <div className="flex items-start space-x-4">
                   <div className="p-3 bg-blue-100 rounded-lg">
@@ -398,34 +404,127 @@ export const CandidateDashboard: React.FC = () => {
               </Card>
             )}
 
-            {user.score !== undefined && (
-              <Card>
+            {hasCorrection && resultsData && (
+              <Card className="mt-6">
                 <div className="flex items-start space-x-4">
                   <div className="p-3 bg-green-100 rounded-lg">
                     <FileText className="h-6 w-6 text-green-600" />
                   </div>
                   <div className="flex-1">
                     <h3 className="text-lg font-semibold text-gray-900 mb-2">
-                      Résultats disponibles
+                      Correction disponible
                     </h3>
-                    <p className="text-gray-600 mb-4">
-                      Félicitations ! Vos modules ont été corrigés et votre certificat est prêt.
-                    </p>
-                    <div className="bg-green-50 border border-green-200 rounded-lg p-4 mb-4">
-                      <div className="flex items-center justify-between mb-2">
-                        <span className="text-green-800 font-medium">Score obtenu :</span>
-                        <span className="text-2xl font-bold text-green-600">{user.score}/100</span>
-                      </div>
-                      <p className="text-green-700 text-sm">
-                        {user.score >= 70 ? 'Certification réussie !' : 'Score insuffisant pour la certification'}
-                      </p>
+                    {(() => {
+                      const certs = Object.values(resultsData || {}) as any[];
+                      const first = certs[0];
+                      const average20 = typeof first?.average_out_of_20 === 'number'
+                        ? first.average_out_of_20
+                        : (first && first.max_score > 0 ? (first.total_score / first.max_score) * 20 : null);
+                      return (
+                        <div>
+                          {average20 !== null && (
+                            <div className="bg-green-50 border border-green-200 rounded-lg p-4 mb-4">
+                              <div className="flex items-center justify-between mb-2">
+                                <span className="text-green-800 font-medium">Moyenne :</span>
+                                <span className="text-2xl font-bold text-green-600">{Number(average20).toFixed(1)}/20</span>
+                              </div>
+                            </div>
+                          )}
+                          <div className="space-y-3">
+                            {first && first.modules && Object.values(first.modules).map((m: any) => {
+                              const score20 = typeof m.score_out_of_20 === 'number' ? m.score_out_of_20 : (m.max_score > 0 ? (m.score / m.max_score) * 20 : 0);
+                              // Parse des notes examinateur si c'est une chaîne JSON
+                              let parsedNotes: Array<{ q: string; score?: any; feedback?: any }> = [];
+                              if (m.examiner_notes) {
+                                try {
+                                  const obj = typeof m.examiner_notes === 'string' ? JSON.parse(m.examiner_notes) : m.examiner_notes;
+                                  if (obj && typeof obj === 'object') {
+                                    parsedNotes = Object.keys(obj).map((k) => ({ q: k, score: obj[k]?.score, feedback: obj[k]?.feedback }));
+                                  }
+                                } catch {}
+                              }
+                              return (
+                                <div key={m.module_name} className="border border-gray-200 rounded-lg p-3">
+                                  <div className="flex items-center justify-between">
+                                    <div className="font-medium text-gray-900">{m.module_name}</div>
+                                    <div className="text-sm font-semibold text-blue-600">{Number(score20).toFixed(1)}/20</div>
+                                  </div>
+                                  {parsedNotes.length > 0 && (
+                                    <ul className="mt-2 text-sm text-gray-700 space-y-1">
+                                      {parsedNotes.map((n) => (
+                                        <li key={n.q} className="flex items-start justify-between">
+                                          <span className="text-gray-600">Question {n.q}</span>
+                                          <span className="ml-2 text-gray-900">Note: {n.score ?? '-'}{n.feedback ? ` — Commentaire: ${n.feedback}` : ''}</span>
+                                        </li>
+                                      ))}
+                                    </ul>
+                                  )}
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      );
+                    })()}
+                  </div>
+                </div>
+              </Card>
+            )}
+
+            {hasCertificates && (
+              <Card>
+                <div className="flex items-start space-x-4">
+                  <div className="p-3 bg-green-100 rounded-lg">
+                    <Download className="h-6 w-6 text-green-600" />
+                  </div>
+                  <div className="flex-1">
+                    <h3 className="text-lg font-semibold text-gray-900 mb-2">
+                      Certification disponible
+                    </h3>
+                    <div className="overflow-x-auto">
+                      <table className="w-full">
+                        <thead>
+                          <tr className="border-b border-gray-200">
+                            <th className="text-left py-2 px-3 font-medium text-gray-900">Valeur</th>
+                            <th className="text-left py-2 px-3 font-medium text-gray-900">Certification</th>
+                            <th className="text-left py-2 px-3 font-medium text-gray-900">Action</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {myCertificates.map((c) => (
+                            <tr key={`${c.candidate_id}-${c.certification_type}-${c.sent_at || ''}`} className="border-b border-gray-100">
+                              <td className="py-2 px-3 font-medium text-gray-900">{c.candidate_name || `${user.firstName} ${user.lastName}`}</td>
+                              <td className="py-2 px-3 text-gray-900">{c.certification_type}</td>
+                              <td className="py-2 px-3">
+                                <button
+                                  className="text-blue-600 hover:underline"
+                                  onClick={async () => {
+                                    try {
+                                      const url = `${API_BASE_URL}/candidate/certificates/download/${c.certification_type}`;
+                                      const res = await fetch(url, { headers: { Authorization: `Bearer ${getToken()}` } });
+                                      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                                      const blob = await res.blob();
+                                      const a = document.createElement('a');
+                                      const objectUrl = URL.createObjectURL(blob);
+                                      a.href = objectUrl;
+                                      a.download = `certificate-${c.candidate_id}-${c.certification_type}.pdf`;
+                                      document.body.appendChild(a);
+                                      a.click();
+                                      a.remove();
+                                      URL.revokeObjectURL(objectUrl);
+                                    } catch (e) {
+                                      alert('Téléchargement impossible. Réessayez plus tard.');
+                                    }
+                                  }}
+                                >
+                                  Télécharger
+                                </button>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
                     </div>
-                    {user.score >= 70 && (
-                      <Button className="flex items-center space-x-2">
-                        <Download className="h-4 w-4" />
-                        <span>Télécharger le certificat</span>
-                      </Button>
-                    )}
                   </div>
                 </div>
               </Card>
@@ -434,7 +533,7 @@ export const CandidateDashboard: React.FC = () => {
 
           {/* Sidebar */}
           <div className="space-y-6">
-            <Card>
+            <Card className='mt-6'>
               <div className="flex justify-between items-center mb-4">
                 <h3 className="font-semibold text-gray-900">Certification</h3>
               {!paymentCompleted && (
@@ -488,17 +587,41 @@ export const CandidateDashboard: React.FC = () => {
                 </div>
                 <div className="flex justify-between text-sm">
                   <span className="text-gray-600">Statut :</span>
-                  <span className={`font-medium ${
-                    user.score !== undefined ? 'text-green-600' :
-                    user.examTaken ? 'text-blue-600' :
-                    paymentCompleted ? 'text-orange-600' : 'text-gray-600'
-                  }`}>
-                    {user.score !== undefined ? 'Certifié' :
-                     user.examTaken ? 'En correction' :
-                     paymentCompleted ? 'Prêt pour modules' : 'En attente de paiement'}
-                  </span>
+                  <span className={`font-medium ${statusInfo.cls}`}>{statusInfo.text}</span>
                 </div>
               </div>
+            </Card>
+
+            <Card>
+              <div className="flex justify-between items-center mb-4">
+                <h3 className="font-semibold text-gray-900">Certificats</h3>
+              </div>
+              {myCertificates.length === 0 ? (
+                <p className="text-sm text-gray-600">Aucun certificat envoyé pour le moment.</p>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full">
+                    <thead>
+                      <tr className="border-b border-gray-200">
+                        <th className="text-left py-2 px-3 font-medium text-gray-900">Valeur</th>
+                        <th className="text-left py-2 px-3 font-medium text-gray-900">Certification</th>
+                        <th className="text-left py-2 px-3 font-medium text-gray-900">Action</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {myCertificates.map((c) => (
+                        <tr key={`${c.candidate_id}-${c.certification_type}-${c.sent_at || ''}`} className="border-b border-gray-100">
+                          <td className="py-2 px-3 font-medium text-gray-900">{c.candidate_name || `${user.firstName} ${user.lastName}`}</td>
+                          <td className="py-2 px-3 text-gray-900">{c.certification_type}</td>
+                          <td className="py-2 px-3">
+                            <a className="text-blue-600 hover:underline" href={c.url} target="_blank" rel="noreferrer">Télécharger</a>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
             </Card>
 
             <Card>

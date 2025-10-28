@@ -60,11 +60,13 @@ interface Payment {
 }
 
 interface Certificate {
-  id: string;
-  candidateName: string;
-  score: number;
-  issuedAt: string;
-  downloadUrl: string;
+  filename: string;
+  url: string;
+  candidate_id: string;
+  candidate_name?: string;
+  certification_type: string;
+  average_out_of_20?: number;
+  issuedAt?: string;
 }
 
 type QuestionType = 'qcm' | 'free_text';
@@ -705,19 +707,7 @@ export const AdminDashboard: React.FC = () => {
             );
           }
 
-          if (totalScore >= 70) {
-            const candidate = users.find(u => u.id === submission.candidateId);
-            if (candidate) {
-              const newCertificate: Certificate = {
-                id: `cert-${Date.now()}`,
-                candidateName: `${candidate.firstName} ${candidate.lastName}`,
-                score: totalScore,
-                issuedAt: now,
-                downloadUrl: `/certificates/${candidate.id}-${Date.now()}.pdf`
-              };
-              setCertificates(prev => [...prev, newCertificate]);
-            }
-          }
+          // La génération et l'enregistrement du certificat sont gérés côté serveur
 
           const updatedSubmission: ExamSubmissionData = {
             ...submission,
@@ -742,15 +732,21 @@ export const AdminDashboard: React.FC = () => {
     }
   };
 
-  const [certificates, setCertificates] = useState<Certificate[]>([
-    {
-      id: '1',
-      candidateName: 'Marie Dubois',
-      score: 85,
-      issuedAt: '2024-01-16',
-      downloadUrl: '/certificates/marie-dubois.pdf'
+  const [certificates, setCertificates] = useState<Certificate[]>([]);
+  const loadCertificates = async () => {
+    try {
+      const res = await fetch(`${API_BASE}/admin/certificates`, {
+        headers: { 'Authorization': `Bearer ${getToken()}`, 'Accept': 'application/json' }
+      });
+      const data = await res.json();
+      if (res.ok && data?.success) {
+        setCertificates(Array.isArray(data.certificates) ? data.certificates : []);
+      }
+    } catch (e) {
+      console.error('Erreur chargement certificats', e);
     }
-  ]);
+  };
+  useEffect(() => { if (activeSection === 'certificates') loadCertificates(); }, [activeSection]);
 
   // User form state
   const [userForm, setUserForm] = useState({
@@ -1293,25 +1289,57 @@ export const AdminDashboard: React.FC = () => {
   };
 
   const downloadCertificate = (certificate: Certificate) => {
-    const url = /^https?:\/\//.test(certificate.downloadUrl)
-      ? certificate.downloadUrl
-      : `${SITE_BASE}${certificate.downloadUrl}`;
-    window.open(url, '_blank');
+    // Télécharger via fetch avec Authorization puis sauvegarder en blob
+    const url = `${API_BASE}/admin/certificates/download/${certificate.candidate_id}/${certificate.certification_type}`;
+    fetch(url, {
+      method: 'GET',
+      headers: { 'Authorization': `Bearer ${getToken()}` }
+    })
+      .then(async (res) => {
+        if (!res.ok) {
+          const txt = await res.text().catch(() => '');
+          throw new Error(`Téléchargement échoué (${res.status}) ${txt}`);
+        }
+        return res.blob();
+      })
+      .then((blob) => {
+        const objectUrl = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = objectUrl;
+        a.download = certificate.filename || `certificate-${certificate.candidate_id}-${certificate.certification_type}.pdf`;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        URL.revokeObjectURL(objectUrl);
+      })
+      .catch((err) => {
+        console.error('Erreur téléchargement certificat:', err);
+        if (typeof toast !== 'undefined') toast.error('Téléchargement du certificat impossible');
+      });
   };
 
-  const sendCertificateByEmail = (certificate: Certificate) => {
-    const subject = encodeURIComponent('Votre certificat de réussite');
-    const verifyUrl = `${SITE_BASE}/certificates/verify`;
-    const link = /^https?:\/\//.test(certificate.downloadUrl)
-      ? certificate.downloadUrl
-      : `${SITE_BASE}${certificate.downloadUrl}`;
-    const body = encodeURIComponent(
-      `Bonjour ${certificate.candidateName},\n\n` +
-      `Veuillez trouver votre certificat au lien suivant : ${link}\n` +
-      `Vérification publique: ${verifyUrl}\n\n` +
-      `Cordialement.`
-    );
-    window.location.href = `mailto:?subject=${subject}&body=${body}`;
+  // Envoyer le certificat au candidat (disponible dans son dashboard)
+  const sendCertificate = async (certificate: Certificate) => {
+    try {
+      const res = await fetch(`${API_BASE}/admin/certificates/send`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${getToken()}`,
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        },
+        body: JSON.stringify({
+          candidate_id: certificate.candidate_id,
+          cert_type: certificate.certification_type,
+        })
+      });
+      const data = await res.json().catch(() => null);
+      if (!res.ok || !data?.success) throw new Error(data?.message || 'Erreur envoi');
+      if (typeof toast !== 'undefined') toast.success('Certificat envoyé au candidat');
+    } catch (err) {
+      console.error('Erreur envoi certificat:', err);
+      if (typeof toast !== 'undefined') toast.error("Impossible d'envoyer le certificat");
+    }
   };
 
   // Fonctions pour la gestion des questions d'examen
@@ -2715,19 +2743,31 @@ export const AdminDashboard: React.FC = () => {
                     <thead>
                       <tr className="border-b border-gray-200">
                         <th className="text-left py-3 px-4 font-medium text-gray-900">Candidat</th>
-                        <th className="text-left py-3 px-4 font-medium text-gray-900">Score</th>
-                        <th className="text-left py-3 px-4 font-medium text-gray-900">Date émission</th>
+                        <th className="text-left py-3 px-4 font-medium text-gray-900">Certification</th>
+                        <th className="text-left py-3 px-4 font-medium text-gray-900">Moyenne</th>
                         <th className="text-left py-3 px-4 font-medium text-gray-900">Actions</th>
                       </tr>
                     </thead>
                     <tbody>
                       {certificates.map((certificate) => (
-                        <tr key={certificate.id} className="border-b border-gray-100">
-                          <td className="py-3 px-4 font-medium text-gray-900">{certificate.candidateName}</td>
-                          <td className="py-3 px-4">
-                            <span className="font-bold text-green-600">{certificate.score}/100</span>
+                        <tr key={certificate.filename} className="border-b border-gray-100">
+                          <td className="py-3 px-4 font-medium text-gray-900">{certificate.candidate_name || certificate.candidate_id || '—'}</td>
+                          <td className="py-3 px-4 text-gray-900">{certificate.certification_type || '—'}</td>
+                          <td className="py-3 px-4 text-gray-900">
+                            {typeof certificate.average_out_of_20 === 'number' ? (
+                              <span
+                                className={
+                                  certificate.average_out_of_20 < 10
+                                    ? 'text-red-600 font-semibold'
+                                    : certificate.average_out_of_20 < 15
+                                      ? 'text-blue-600 font-semibold'
+                                      : 'text-green-600 font-semibold'
+                                }
+                              >
+                                {certificate.average_out_of_20.toFixed(1)}/20
+                              </span>
+                            ) : '—'}
                           </td>
-                          <td className="py-3 px-4 text-gray-900">{formatDate(certificate.issuedAt)}</td>
                           <td className="py-3 px-4">
                             <div className="flex space-x-2">
                               <Button
@@ -2740,10 +2780,9 @@ export const AdminDashboard: React.FC = () => {
                               </Button>
                               <Button
                                 size="sm"
-                                variant="secondary"
-                                onClick={() => sendCertificateByEmail(certificate)}
+                                variant="primary"
+                                onClick={() => sendCertificate(certificate)}
                               >
-                                <Mail className="h-3 w-3 mr-1" />
                                 Envoyer
                               </Button>
                             </div>

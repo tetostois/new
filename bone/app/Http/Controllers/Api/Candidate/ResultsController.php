@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api\Candidate;
 use App\Http\Controllers\Controller;
 use App\Models\ExamSubmission;
 use App\Models\ModuleProgress;
+use App\Models\ExamQuestion;
 use Illuminate\Http\Request;
 
 class ResultsController extends Controller
@@ -61,14 +62,17 @@ class ResultsController extends Controller
                 ];
             }
             
-            // Calculer le score maximum pour ce module (20 questions × points par question)
-            $maxModuleScore = 100; // Score maximum par module
+            // Calculer dynamiquement le score maximum pour ce module
+            $maxModuleScore = (int) ExamQuestion::where('certification_type', $certificationType)
+                ->where('module', $moduleId)
+                ->sum('points');
             
             $results[$certificationType]['modules'][$moduleId] = [
                 'module_name' => $moduleNames[$moduleId] ?? $moduleId,
                 'score' => $submission->total_score,
                 'max_score' => $maxModuleScore,
-                'percentage' => round(($submission->total_score / $maxModuleScore) * 100, 1),
+                'percentage' => $maxModuleScore > 0 ? round(($submission->total_score / $maxModuleScore) * 100, 1) : 0,
+                'score_out_of_20' => $maxModuleScore > 0 ? round(($submission->total_score / $maxModuleScore) * 20, 1) : 0,
                 'submitted_at' => $submission->submitted_at,
                 'graded_at' => $submission->graded_at,
                 'examiner_notes' => $submission->examiner_notes,
@@ -83,6 +87,9 @@ class ResultsController extends Controller
         foreach ($results as $certificationType => &$certification) {
             if ($certification['max_score'] > 0) {
                 $certification['average_score'] = round(($certification['total_score'] / $certification['max_score']) * 100, 1);
+                $certification['average_out_of_20'] = round((($certification['total_score'] / $certification['max_score']) * 20), 1);
+            } else {
+                $certification['average_out_of_20'] = 0;
             }
         }
         

@@ -500,6 +500,17 @@ export const ExaminerDashboard: React.FC = () => {
                   if (gradedSubmissions.length === 0) return null;
                   
                   const firstSubmission = candidateSubmissions[0];
+                  // Calcul de la moyenne sur 20 pour ce candidat, basé sur les modules affichés
+                  const avgOutOf20 = (() => {
+                    const vals: number[] = gradedSubmissions.map(s => {
+                      const maxPts = maxPointsBySubmission[s.id];
+                      if (!maxPts || maxPts <= 0) return NaN;
+                      return ((s.total_score || 0) / maxPts) * 20;
+                    }).filter(v => !isNaN(v));
+                    if (vals.length === 0) return null;
+                    const sum = vals.reduce((a, b) => a + b, 0);
+                    return (sum / vals.length).toFixed(2);
+                  })();
                   
                   return (
                     <div key={candidateId} className="border border-gray-200 rounded-lg p-3">
@@ -544,6 +555,11 @@ export const ExaminerDashboard: React.FC = () => {
                           );
                         })}
                       </div>
+                      {avgOutOf20 && (
+                        <div className="mt-2 flex justify-end">
+                          <span className="text-xs text-gray-700">Moyenne: <span className="font-semibold text-blue-600">{avgOutOf20}/20</span></span>
+                        </div>
+                      )}
                     </div>
                   );
                 })}

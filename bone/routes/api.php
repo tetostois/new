@@ -12,6 +12,7 @@ use App\Http\Controllers\Api\Candidate\ModuleProgressController;
 use App\Http\Controllers\Api\Candidate\ExamSubmissionController;
 use App\Http\Controllers\Api\Payment\CamPayController;
 use App\Http\Controllers\Api\EmailVerificationController;
+use App\Http\Controllers\Api\CertificateController;
 
 // Routes publiques (sans authentification)
 Route::post('/auth/register', [AuthController::class, 'register']);
@@ -46,6 +47,9 @@ Route::middleware('auth:api')->group(function () {
         Route::post('/module-progress/unlock', [ModuleProgressController::class, 'unlock']);
         Route::post('/module-progress/start', [ModuleProgressController::class, 'start']);
         Route::post('/module-progress/complete', [ModuleProgressController::class, 'complete']);
+        // Certificats envoyés à ce candidat
+        Route::get('/certificates', [CertificateController::class, 'listForCandidate']);
+        Route::get('/certificates/download/{certType}', [CertificateController::class, 'downloadForCandidate']);
         
         // Soumission d'examens
         Route::post('/exam-submissions/submit', [ExamSubmissionController::class, 'submit']);
@@ -80,6 +84,11 @@ Route::middleware('auth:api')->group(function () {
         Route::post('/exam-submissions/{id}/assign', [AdminExamSubmissionController::class, 'assign']);
         Route::get('/exam-submissions-stats', [AdminExamSubmissionController::class, 'stats']);
         Route::get('/available-examiners', [AdminExamSubmissionController::class, 'availableExaminers']);
+        // Certificats
+        Route::get('/certificates', [CertificateController::class, 'index']);
+        Route::get('/certificates/download/{candidateId}/{certType}', [CertificateController::class, 'download']);
+        Route::post('/certificates/send', [CertificateController::class, 'send']);
+        Route::post('/certificates/rebuild', [CertificateController::class, 'rebuild']);
     });
 
     // Routes pour les examinateurs (protégé par rôle examiner)
