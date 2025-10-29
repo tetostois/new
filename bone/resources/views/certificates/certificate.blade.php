@@ -7,21 +7,21 @@
     <style>
         body { font-family: DejaVu Sans, sans-serif; background:#f3f4f6; margin:0; padding:32px; }
         .certificate { max-width: 1000px; margin: 0 auto; background:#fff; box-shadow:0 10px 25px rgba(0,0,0,.15); }
-        .header { background:#ca8a04; color:#111; padding:32px 48px; display:flex; align-items:center; justify-content:space-between; }
-        .qr { width:128px; height:128px; background:#fff; display:flex; align-items:center; justify-content:center; }
-        .titleBox { text-align:center; flex:1; padding:0 32px; }
-        .level { font-size:56px; font-weight:800; letter-spacing:8px; margin:0 0 6px 0; }
-        .subtitle { font-size:18px; letter-spacing:6px; text-transform:uppercase; margin:0; }
-        .body { padding:64px 48px; text-align:center; }
+        .header { background:#ca8a04; color:#111; padding:24px 40px; display:flex; align-items:center; justify-content:space-between; }
+        .qr { width:120px; height:120px; background:#fff; display:flex; align-items:center; justify-content:center; }
+        .titleBox { text-align:center; flex:1; padding:0 24px; }
+        .title { font-size:40px; font-weight:800; letter-spacing:4px; margin:0; text-transform:uppercase; }
+        .subtitle { font-size:14px; letter-spacing:4px; text-transform:uppercase; margin:6px 0 0 0; color:#1f2937; }
+        .body { padding:48px 48px 40px; text-align:center; }
         .logoCircle { width:192px; height:192px; border-radius:9999px; border:16px solid #d1d5db; display:flex; align-items:center; justify-content:center; margin:0 auto 32px; }
-        .muted { color:#6b7280; font-size:12px; letter-spacing:4px; text-transform:uppercase; }
-        .name { font-size:44px; font-weight:800; letter-spacing:2px; text-transform:uppercase; margin:24px 0 40px; }
-        .certName { font-size:32px; font-weight:800; margin:32px 0 0; }
-        .verify { margin-top:64px; color:#6b7280; font-size:14px; }
+        .muted { color:#6b7280; font-size:12px; letter-spacing:3px; text-transform:uppercase; }
+        .name { font-size:44px; font-weight:800; letter-spacing:2px; text-transform:uppercase; margin:16px 0 24px; }
+        .certName { font-size:30px; font-weight:800; margin:18px 0 0; text-transform:capitalize; }
+        .verify { margin-top:40px; color:#6b7280; font-size:13px; }
         .verify b { color:#374151; }
-        .footer { background:#ca8a04; padding:24px 48px; display:flex; justify-content:space-between; align-items:flex-end; color:#111; }
+        .footer { background:#ca8a04; padding:18px 40px; display:flex; justify-content:space-between; align-items:flex-end; color:#111; }
         .footer .col { text-align:center; }
-        .footer .label { font-size:10px; letter-spacing:4px; text-transform:uppercase; margin-top:4px; }
+        .footer .label { font-size:10px; letter-spacing:3px; text-transform:uppercase; margin-top:4px; }
         .btnPrint { display:inline-block; background:#ca8a04; color:#fff; padding:12px 28px; border-radius:8px; text-decoration:none; margin-top:24px; }
         @media print { body { padding:0; background:#fff; } .btnPrint, .no-print { display:none; } }
     </style>
@@ -88,42 +88,39 @@
 
 <div class="certificate">
     <div class="header">
-        <div class="qr">
-            @if($cert->qr_code_path)
-                <img src="{{ asset('storage/' . $cert->qr_code_path) }}" alt="QR Code" style="width:100%;height:100%;object-fit:contain;"/>
-            @else
-                <div style="width:100%;height:100%;background:#e5e7eb;color:#6b7280;font-size:12px;display:flex;align-items:center;justify-content:center;">QR CODE</div>
-            @endif
-        </div>
-        <div class="titleBox">
-            <h1 class="level">LEVEL {{ $cert->level ?? 1 }}</h1>
-            <p class="subtitle">Certification</p>
-        </div>
-        <div style="width:128px;"></div>
-    </div>
-
-    <div class="body">
-        <div style="display:flex;justify-content:center;margin-bottom:32px;">
+        <div style="width:128px; display:flex; align-items:center; justify-content:center;">
             @if($logoDataUri)
-                <img src="{{ $logoDataUri }}" alt="Logo" style="width:192px;height:192px;object-fit:contain;"/>
+                <img src="{{ $logoDataUri }}" alt="Logo" style="width:96px;height:96px;object-fit:contain;"/>
             @else
-                <div class="logoCircle">
+                <div class="logoCircle" style="width:96px;height:96px;border-width:8px;">
                     <div style="text-align:center;">
-                        <div style="color:#dc2626;font-size:32px;margin-bottom:8px;">🍁</div>
-                        <div style="color:#2563eb;font-weight:700;font-size:18px;">ICC</div>
+                        <div style="color:#dc2626;font-size:24px;margin-bottom:4px;">🍁</div>
+                        <div style="color:#2563eb;font-weight:700;font-size:14px;">ICC</div>
                     </div>
                 </div>
             @endif
         </div>
+        <div class="titleBox">
+            <h1 class="title">Certificat de Réussite</h1>
+            <p class="subtitle">Délivré par International Consulting Canada</p>
+        </div>
+        <div class="qr">
+            @if($cert->qr_code_path)
+                <img src="{{ asset('storage/' . $cert->qr_code_path) }}" alt="QR Code" style="width:100%;height:100%;object-fit:contain;"/>
+            @else
+                <div style="width:100%;height:100%;background:#fff;color:#6b7280;font-size:12px;display:flex;align-items:center;justify-content:center;border:1px solid #e5e7eb;">QR CODE</div>
+            @endif
+        </div>
+    </div>
 
-        <p class="muted" style="margin-bottom:24px;">International Consulting Canada Proudly Recognizes That</p>
+    <div class="body">
+        <p class="muted" style="margin-bottom:18px;">Certifie que</p>
         <div class="name">{{ strtoupper(trim(($cand->first_name ?? '') . ' ' . ($cand->last_name ?? ''))) }}</div>
-        <p class="muted" style="margin-bottom:18px;">Has Successfully Completed Training and Certification Requirements For</p>
+        <p class="muted" style="margin-bottom:12px;">a satisfait aux exigences pour l'obtention de la certification</p>
         <div class="certName">{{ $cert->type->name ?? $cert->certification_type }}</div>
-
         <div class="verify">
-            <p style="margin:8px 0;">Validity of this certificate could be verified at</p>
-            <p><b>{{ $website }}</b> & by scanning the QR Code</p>
+            <p style="margin:8px 0;">Pour vérifier l'authenticité de ce certificat, visitez</p>
+            <p><b>{{ $website }}</b> ou scannez le QR code.</p>
         </div>
     </div>
 
@@ -137,9 +134,8 @@
             <div class="label">ID Number</div>
         </div>
         <div class="col">
-            <div class="font-bold" style="font-size:20px;font-style:italic;">{{ $authorized->name }}</div>
-            <div class="label" style="margin-top:6px;">DocuSigned by:</div>
-            <div class="label">Authorized Expert</div>
+            <div class="font-bold" style="font-size:16px;font-style:italic;">{{ $authorized->name }}</div>
+            <div class="label" style="margin-top:6px;">Signature</div>
             <div style="font-size:10px;">{{ $authorized->phone }}</div>
         </div>
     </div>

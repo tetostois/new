@@ -125,8 +125,10 @@ class UserController extends Controller
             'email'          => $data['email'],
             'phone'          => $data['phone'],
             'specialization' => $data['specialization'],
-            'qualifications' => null,
-            'experience_years' => null,
+            // Stocker le champ libre d'expérience dans qualifications
+            'qualifications' => $data['experience'] ?? null,
+            // Optionnel: si une valeur numérique est fournie, la stocker aussi
+            'experience_years' => is_numeric($data['experience'] ?? null) ? (int)$data['experience'] : null,
             'password'       => Hash::make($request->password),
             'role'           => User::ROLE_EXAMINER,
             'is_active'      => true,
@@ -208,13 +210,28 @@ class UserController extends Controller
             'city'       => 'sometimes|nullable|string|max:255',
             'country'    => 'sometimes|nullable|string|max:255',
             'profession' => 'sometimes|nullable|string|max:255',
+            'specialization' => 'sometimes|nullable|string|max:150',
+            'experience' => 'sometimes|nullable|string|max:500',
+            'password'   => 'sometimes|nullable|string|min:6|confirmed',
         ]);
 
         if ($validator->fails()) {
             return response()->json(['message' => 'Validation échouée', 'errors' => $validator->errors()], 422);
         }
 
-        $user->fill($validator->validated());
+        $data = $validator->validated();
+        // Mapper experience (texte libre) vers qualifications et éventuellement experience_years
+        if (array_key_exists('experience', $data)) {
+            $user->qualifications = $data['experience'];
+            if (is_numeric($data['experience'])) {
+                $user->experience_years = (int) $data['experience'];
+            }
+            unset($data['experience']);
+        }
+        $user->fill($data);
+        if ($request->filled('password')) {
+            $user->password = Hash::make($request->password);
+        }
         $user->save();
 
         return response()->json(['message' => 'Utilisateur mis à jour', 'user' => $user]);

@@ -195,7 +195,7 @@ export const AdminDashboard: React.FC = () => {
     createdAt: raw.createdAt ?? raw.created_at ?? new Date().toISOString(),
     profession: raw.profession ?? '',
     specialization: raw.specialization ?? '',
-    experience: raw.experience ?? '',
+    experience: (raw.experience ?? raw.qualifications ?? (typeof raw.experience_years !== 'undefined' ? String(raw.experience_years) : '')),
   });
 
   // Questions helpers
@@ -929,6 +929,22 @@ export const AdminDashboard: React.FC = () => {
         closeUserModal();
         toast.success('Administrateur créé avec succès');
       } else if (modalMode === 'edit' && selectedUser) {
+        // Si changement de mot de passe fourni, valider localement et l'ajouter au payload
+        if (userForm.password) {
+          if (userForm.password.length < 6) {
+            setFieldErrors({ password: ['Le mot de passe doit contenir au moins 6 caractères'] });
+            setError('Veuillez corriger les erreurs dans le formulaire');
+            return;
+          }
+          if (userForm.password !== userForm.passwordConfirm) {
+            setFieldErrors({ passwordConfirm: ['Les mots de passe ne correspondent pas'] });
+            setError('Veuillez corriger les erreurs dans le formulaire');
+            return;
+          }
+          (payload as any).password = userForm.password;
+          (payload as any).password_confirmation = userForm.passwordConfirm;
+        }
+
         const res = await fetch(`${API_BASE}/admin/users/${selectedUser.id}`, {
           method: 'PATCH',
           headers: { 
@@ -1163,7 +1179,7 @@ export const AdminDashboard: React.FC = () => {
         closeExaminerModal();
         toast.success('Examinateur créé avec succès');
       } else if (modalMode === 'edit' && selectedExaminer) {
-        const payload = {
+        const payload: Record<string, any> = {
           first_name: examinerForm.firstName,
           last_name: examinerForm.lastName,
           email: examinerForm.email,
@@ -1171,6 +1187,22 @@ export const AdminDashboard: React.FC = () => {
           specialization: examinerForm.specialization || '',
           experience: examinerForm.experience || ''
         };
+
+        // Inclure changement de mot de passe si fourni
+        if (examinerForm.password) {
+          if (examinerForm.password.length < 6) {
+            setFieldErrors({ password: ['Le mot de passe doit contenir au moins 6 caractères'] });
+            setError('Veuillez corriger les erreurs dans le formulaire');
+            return;
+          }
+          if (examinerForm.password !== examinerForm.passwordConfirm) {
+            setFieldErrors({ passwordConfirm: ['Les mots de passe ne correspondent pas'] });
+            setError('Veuillez corriger les erreurs dans le formulaire');
+            return;
+          }
+          payload.password = examinerForm.password;
+          payload.password_confirmation = examinerForm.passwordConfirm;
+        }
         
         const res = await fetch(`${API_BASE}/admin/users/${selectedExaminer.id}`, {
           method: 'PATCH',
@@ -2932,7 +2964,7 @@ export const AdminDashboard: React.FC = () => {
                     />
                   </>
                 )}
-                {modalMode === 'create' && (
+                {(modalMode === 'create') && (
                   <>
                     <Input
                       label="Mot de passe (min 6 caractères)"
@@ -2943,6 +2975,24 @@ export const AdminDashboard: React.FC = () => {
                     />
                     <Input
                       label="Confirmer le mot de passe"
+                      type="password"
+                      value={userForm.passwordConfirm}
+                      onChange={(e) => setUserForm({ ...userForm, passwordConfirm: e.target.value })}
+                      disabled={false}
+                    />
+                  </>
+                )}
+                {(modalMode === 'edit') && (
+                  <>
+                    <Input
+                      label="Changer le mot de passe (optionnel)"
+                      type="password"
+                      value={userForm.password}
+                      onChange={(e) => setUserForm({ ...userForm, password: e.target.value })}
+                      disabled={false}
+                    />
+                    <Input
+                      label="Confirmer le nouveau mot de passe"
                       type="password"
                       value={userForm.passwordConfirm}
                       onChange={(e) => setUserForm({ ...userForm, passwordConfirm: e.target.value })}
@@ -2981,7 +3031,7 @@ export const AdminDashboard: React.FC = () => {
             </div>
             
             <div className="p-6">
-              <div className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <Input
                   label="Prénom"
                   value={examinerForm.firstName}
@@ -2998,7 +3048,12 @@ export const AdminDashboard: React.FC = () => {
                   value={examinerForm.email}
                   onChange={(e) => setExaminerForm({...examinerForm, email: e.target.value})}
                 />
-                {modalMode === 'create' && (
+                <Input
+                  label="Téléphone"
+                  value={examinerForm.phone}
+                  onChange={(e) => setExaminerForm({...examinerForm, phone: e.target.value})}
+                />
+                {modalMode === 'create' ? (
                   <>
                     <Input
                       label="Mot de passe (min 6 caractères)"
@@ -3013,12 +3068,22 @@ export const AdminDashboard: React.FC = () => {
                       onChange={(e) => setExaminerForm({ ...examinerForm, passwordConfirm: e.target.value })}
                     />
                   </>
+                ) : (
+                  <>
+                    <Input
+                      label="Changer le mot de passe (optionnel)"
+                      type="password"
+                      value={examinerForm.password}
+                      onChange={(e) => setExaminerForm({ ...examinerForm, password: e.target.value })}
+                    />
+                    <Input
+                      label="Confirmer le nouveau mot de passe"
+                      type="password"
+                      value={examinerForm.passwordConfirm}
+                      onChange={(e) => setExaminerForm({ ...examinerForm, passwordConfirm: e.target.value })}
+                    />
+                  </>
                 )}
-                <Input
-                  label="Téléphone"
-                  value={examinerForm.phone}
-                  onChange={(e) => setExaminerForm({...examinerForm, phone: e.target.value})}
-                />
                 <Input
                   label="Spécialisation *"
                   value={examinerForm.specialization}
@@ -3030,15 +3095,14 @@ export const AdminDashboard: React.FC = () => {
                   value={examinerForm.experience}
                   onChange={(e) => setExaminerForm({...examinerForm, experience: e.target.value})}
                 />
-                
-                <div className="flex space-x-3 mt-6">
-                  <Button variant="secondary" onClick={closeExaminerModal} className="flex-1">
-                    Annuler
-                  </Button>
-                  <Button onClick={saveExaminer} className="flex-1">
-                    {modalMode === 'create' ? 'Créer' : 'Sauvegarder'}
-                  </Button>
-                </div>
+              </div>
+              <div className="flex space-x-3 mt-6">
+                <Button variant="secondary" onClick={closeExaminerModal} className="flex-1">
+                  Annuler
+                </Button>
+                <Button onClick={saveExaminer} className="flex-1">
+                  {modalMode === 'create' ? 'Créer' : 'Sauvegarder'}
+                </Button>
               </div>
             </div>
           </div>
