@@ -180,6 +180,17 @@ export const AdminDashboard: React.FC = () => {
     }
   }, [activeSection]);
 
+  // Charger les données globales nécessaires au dashboard (utilisateurs, examinateurs, certificats)
+  // pour que les statistiques soient disponibles dès le premier accès
+  useEffect(() => {
+    if (activeSection === 'dashboard') {
+      // Ces chargements sont idempotents et paginés; ils remplissent les tableaux utilisés par les cartes de stats
+      loadUsers();
+      loadExaminers();
+      loadCertificates();
+    }
+  }, [activeSection]);
+
   // API base and helpers
   const API_BASE = (import.meta as any)?.env?.VITE_API_BASE_URL || 'http://127.0.0.1:8000/api';
   const SITE_BASE = API_BASE.replace(/\/api$/, '');
