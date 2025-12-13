@@ -123,6 +123,7 @@ interface ExamSubmissionData {
   gradedAt?: string;
   totalScore?: number;
   examinerId?: string;
+  releasedToCandidate?: boolean;
 }
 
 interface ExamAssignment {
@@ -343,7 +344,8 @@ export const AdminDashboard: React.FC = () => {
           submittedAt: sub.submitted_at,
           gradedAt: sub.graded_at,
           totalScore: sub.total_score || 0,
-          examinerId: sub.examiner_id?.toString()
+          examinerId: sub.examiner_id?.toString(),
+          releasedToCandidate: Boolean(sub.released_to_candidate)
         }));
         
         setExamSubmissionsState(transformedSubmissions);
@@ -396,7 +398,7 @@ export const AdminDashboard: React.FC = () => {
     {
       id: '1',
       candidateName: 'Marie Dubois',
-      amount: 50000,
+      amount: 10,
       method: 'Orange Money',
       status: 'completed',
       date: '2024-01-15'
@@ -404,7 +406,7 @@ export const AdminDashboard: React.FC = () => {
     {
       id: '2',
       candidateName: 'Paul Nkomo',
-      amount: 50000,
+      amount: 10,
       method: 'PayPal',
       status: 'completed',
       date: '2024-01-14'
@@ -2448,15 +2450,39 @@ export const AdminDashboard: React.FC = () => {
                                 return (
                                   <div key={submission.id} className="flex items-center justify-between p-2 bg-gray-50 rounded">
                                     <span className="text-sm text-gray-700">{moduleName}</span>
-                                    <span className={`px-2 py-1 text-xs rounded ${
-                                      submission.status === 'graded' ? 'bg-green-100 text-green-800' :
-                                      submission.status === 'under_review' ? 'bg-yellow-100 text-yellow-800' :
-                                      'bg-blue-100 text-blue-800'
-                                    }`}>
-                                      {submission.status === 'graded' ? 'Corrigé' :
-                                       submission.status === 'under_review' ? 'En cours' :
-                                       'Soumis'}
-                                    </span>
+                                    <div className="flex items-center space-x-2">
+                                      <span className={`px-2 py-1 text-xs rounded ${
+                                        submission.status === 'graded' ? 'bg-green-100 text-green-800' :
+                                        submission.status === 'under_review' ? 'bg-yellow-100 text-yellow-800' :
+                                        'bg-blue-100 text-blue-800'
+                                      }`}>
+                                        {submission.status === 'graded' ? (submission.releasedToCandidate ? 'Publié' : 'Corrigé') :
+                                         submission.status === 'under_review' ? 'En cours' :
+                                         'Soumis'}
+                                      </span>
+                                      {submission.status === 'graded' && !submission.releasedToCandidate && (
+                                        <button
+                                          className="text-xs px-2 py-1 bg-indigo-600 text-white rounded hover:bg-indigo-700"
+                                          onClick={async () => {
+                                            try {
+                                              const r = await AdminService.releaseSubmission(submission.id);
+                                              if (r?.success) {
+                                                // rafraîchir la liste
+                                                await loadExamSubmissions();
+                                                if (typeof toast !== 'undefined') toast.success('Correction publiée au candidat');
+                                              } else {
+                                                alert('Échec de la publication');
+                                              }
+                                            } catch (e) {
+                                              alert('Erreur lors de la publication');
+                                            }
+                                          }}
+                                          title="Publier cette correction au candidat"
+                                        >
+                                          Publier
+                                        </button>
+                                      )}
+                                    </div>
                                   </div>
                                 );
                               })}
@@ -2882,7 +2908,7 @@ export const AdminDashboard: React.FC = () => {
                     <label className="block text-sm font-medium text-gray-700 mb-1">
                       Prix de l'examen (FCFA)
                     </label>
-                    <Input type="number" defaultValue="50000" className="w-32" />
+                    <Input type="number" defaultValue="10" className="w-32" />
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">

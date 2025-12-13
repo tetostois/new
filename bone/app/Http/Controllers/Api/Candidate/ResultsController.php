@@ -17,9 +17,10 @@ class ResultsController extends Controller
     {
         $candidateId = auth()->id();
         
-        // Récupérer toutes les soumissions du candidat
+        // Récupérer uniquement les soumissions corrigées ET publiées au candidat
         $submissions = ExamSubmission::where('candidate_id', $candidateId)
             ->where('status', 'graded')
+            ->where('released_to_candidate', true)
             ->orderBy('submitted_at', 'desc')
             ->get();
 

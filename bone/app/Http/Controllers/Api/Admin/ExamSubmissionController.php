@@ -143,5 +143,42 @@ class ExamSubmissionController extends Controller
             'examiners' => $examiners,
         ]);
     }
+
+    /**
+     * Publier/mettre à disposition du candidat la correction d'une soumission.
+     * Conditions: la soumission doit être 'graded'.
+     */
+    public function release(string $id)
+    {
+        $submission = ExamSubmission::find($id);
+        if (!$submission) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Soumission non trouvée',
+            ], 404);
+        }
+        if ($submission->status !== 'graded') {
+            return response()->json([
+                'success' => false,
+                'message' => 'La soumission doit être corrigée avant publication',
+            ], 409);
+        }
+        if ($submission->released_to_candidate) {
+            return response()->json([
+                'success' => true,
+                'message' => 'Déjà publiée au candidat',
+                'submission' => $submission,
+            ]);
+        }
+        $submission->released_to_candidate = true;
+        $submission->released_at = now();
+        $submission->save();
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Correction publiée au candidat',
+            'submission' => $submission,
+        ]);
+    }
 }
 

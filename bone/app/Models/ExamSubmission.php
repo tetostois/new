@@ -20,6 +20,8 @@ class ExamSubmission extends Model
         'total_score',
         'examiner_id',
         'examiner_notes',
+        'released_to_candidate',
+        'released_at',
     ];
 
     protected $casts = [
@@ -29,6 +31,8 @@ class ExamSubmission extends Model
         'graded_at' => 'datetime',
         'total_score' => 'integer',
         'examiner_notes' => 'array',
+        'released_to_candidate' => 'boolean',
+        'released_at' => 'datetime',
     ];
 
     /**

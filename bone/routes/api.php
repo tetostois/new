@@ -13,6 +13,7 @@ use App\Http\Controllers\Api\Candidate\ExamSubmissionController;
 use App\Http\Controllers\Api\Payment\CamPayController;
 use App\Http\Controllers\Api\EmailVerificationController;
 use App\Http\Controllers\Api\CertificateController;
+use App\Http\Controllers\Api\Candidate\ProfileController as CandidateProfileController;
 
 // Routes publiques (sans authentification)
 Route::post('/auth/register', [AuthController::class, 'register']);
@@ -29,6 +30,13 @@ Route::post('/admin/users/create-admin', [AdminUserController::class, 'createAdm
 
 // Paiement CamPay: initiation publique (pas besoin d'auth pour obtenir l'URL de redirection)
 Route::post('/mobile/campay/initiate', [CamPayController::class, 'initiate']);
+// Endpoints API pour MOMO et autres opérations Campay
+Route::post('/mobile/campay/collect', [CamPayController::class, 'collect']);
+Route::post('/mobile/campay/withdraw', [CamPayController::class, 'withdraw']);
+Route::get('/mobile/campay/status/{reference}', [CamPayController::class, 'status']);
+Route::get('/mobile/campay/balance', [CamPayController::class, 'balance']);
+Route::get('/mobile/campay/history', [CamPayController::class, 'history']);
+Route::post('/mobile/campay/webhook', [CamPayController::class, 'webhook']);
 
 // Routes protégées par JWT (guard api)
 // Routes pour les candidats
@@ -47,6 +55,8 @@ Route::middleware('auth:api')->group(function () {
         Route::post('/module-progress/unlock', [ModuleProgressController::class, 'unlock']);
         Route::post('/module-progress/start', [ModuleProgressController::class, 'start']);
         Route::post('/module-progress/complete', [ModuleProgressController::class, 'complete']);
+        // Mise à jour du type de certification (verrouillée après paiement)
+        Route::put('/certification', [CandidateProfileController::class, 'updateCertification']);
         // Certificats envoyés à ce candidat
         Route::get('/certificates', [CertificateController::class, 'listForCandidate']);
         Route::get('/certificates/download/{certType}', [CertificateController::class, 'downloadForCandidate']);
@@ -82,6 +92,7 @@ Route::middleware('auth:api')->group(function () {
         Route::get('/exam-submissions', [AdminExamSubmissionController::class, 'index']);
         Route::get('/exam-submissions/{id}', [AdminExamSubmissionController::class, 'show']);
         Route::post('/exam-submissions/{id}/assign', [AdminExamSubmissionController::class, 'assign']);
+        Route::post('/exam-submissions/{id}/release', [AdminExamSubmissionController::class, 'release']);
         Route::get('/exam-submissions-stats', [AdminExamSubmissionController::class, 'stats']);
         Route::get('/available-examiners', [AdminExamSubmissionController::class, 'availableExaminers']);
         // Certificats

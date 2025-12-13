@@ -50,7 +50,7 @@ const examsByLevel = {
     title: 'Examen de Leadership - Niveau Intermédiaire',
     description: 'Évaluation approfondie des compétences en leadership et gestion de conflits.',
     duration: 60, // 60 minutes
-    price: 50000, // 50,000 FCFA
+    price: 10, // 10 FCFA
     isActive: true,
     questions: [
       {

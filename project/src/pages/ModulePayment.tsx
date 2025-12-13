@@ -6,6 +6,8 @@ import { PaymentForm } from '../components/payment/PaymentForm';
 import { useAuth } from '../contexts/AuthContext';
 import { useExam } from '../contexts/ExamContext';
 import { getCertificationById } from '../components/data/certifications';
+import { mapCertificationToBackendSlug, mapModuleToBackendSlug } from '../utils/mapping';
+import { ModuleProgressService } from '../services/moduleProgressService';
 
 const ModulePayment: React.FC = () => {
   const navigate = useNavigate();
@@ -28,13 +30,24 @@ const ModulePayment: React.FC = () => {
   const handlePaymentSuccess = () => {
     if (!selectedModule) return;
 
-    // Optionally call backend to record module payment here
-    // For now update local user and start module
-    user.hasPaid = user.hasPaid || false;
+    // Enregistrer l'accès payé par module (persistance légère front)
+    try {
+      const key = `perModulePaid:${certification.id}`;
+      localStorage.setItem(key, selectedModule);
+    } catch {}
 
-    // start the module
-    startModule(certification.id, selectedModule);
-    navigate('/exam');
+    // Marquer le module comme déverrouillé côté backend
+    (async () => {
+      try {
+        await ModuleProgressService.unlockModule({
+          certification_type: mapCertificationToBackendSlug(certification.id),
+          module_id: mapModuleToBackendSlug(selectedModule)
+        });
+      } catch {}
+    })();
+
+    // Rediriger vers la page des conditions d'examen pour ce module
+    navigate(`/exam-conditions?cert=${encodeURIComponent(certification.id)}&module=${encodeURIComponent(selectedModule)}`);
   };
 
   return (

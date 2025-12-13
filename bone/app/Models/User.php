@@ -56,6 +56,9 @@ class User extends Authenticatable implements JWTSubject, MustVerifyEmailContrac
         'last_login_at',
         'email_verified_at',
         'settings',
+        // Champs application
+        'selected_certification',
+        'has_paid',
     ];
 
     /**
@@ -79,6 +82,7 @@ class User extends Authenticatable implements JWTSubject, MustVerifyEmailContrac
         'is_active' => 'boolean',
         'settings' => 'array',
         'last_login_at' => 'datetime',
+        'has_paid' => 'boolean',
     ];
 
     /**
@@ -89,6 +93,7 @@ class User extends Authenticatable implements JWTSubject, MustVerifyEmailContrac
     protected $attributes = [
         'is_active' => true,
         'settings' => '{"notifications": true, "theme": "light"}',
+        'has_paid' => false,
     ];
 
     /**

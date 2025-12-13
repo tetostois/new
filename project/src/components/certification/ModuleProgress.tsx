@@ -12,6 +12,8 @@ interface ModuleProgressProps {
   completedModules: string[];
   currentModule?: string;
   unlockedModules?: string[];
+  // Limiter l'affichage à un sous-ensemble de modules (paiement par module)
+  restrictToModules?: string[];
   onStartModuleWithPayment: (moduleId: string) => void;
   onContinueModule: (moduleId: string) => void;
   examStartDate?: string;
@@ -23,6 +25,7 @@ export const ModuleProgress: React.FC<ModuleProgressProps> = ({
   completedModules,
   currentModule,
   unlockedModules,
+  restrictToModules,
   onStartModuleWithPayment,
   onContinueModule,
   examStartDate,
@@ -32,6 +35,11 @@ export const ModuleProgress: React.FC<ModuleProgressProps> = ({
   const [moduleProgress, setModuleProgress] = useState<ModuleProgressData[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  // Modules visibles (restriction en cas de paiement par module)
+  const visibleModules = (restrictToModules && restrictToModules.length > 0)
+    ? certification.modules.filter(m => restrictToModules.includes(m.id))
+    : certification.modules;
 
   // Fonction pour recharger la progression
   const reloadProgress = async () => {
@@ -191,7 +199,7 @@ export const ModuleProgress: React.FC<ModuleProgressProps> = ({
   const timeRemaining = getTimeRemaining();
   
   // Progression globale dynamique
-  const totalModules = certification.modules.length;
+  const totalModules = visibleModules.length;
   const completedFromBackend = moduleProgress.filter(p => p.status === 'completed').length;
   const completedFallback = completedModules.length;
   const completedCount = completedFromBackend > 0 || moduleProgress.length > 0 ? completedFromBackend : completedFallback;
@@ -271,7 +279,7 @@ export const ModuleProgress: React.FC<ModuleProgressProps> = ({
 
       {!loading && !error && (
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          {certification.modules.map((module, index) => {
+          {visibleModules.map((module, index) => {
           const status = getModuleStatus(module, index);
           const isDisabled = status === 'locked' || timeRemaining === 'Expiré';
 
@@ -296,7 +304,7 @@ export const ModuleProgress: React.FC<ModuleProgressProps> = ({
                   <div className="flex items-center space-x-4 text-xs text-gray-500">
                     <span>20 questions</span>
                     <span>60 minutes</span>
-                    <span>Module {index + 1}/3</span>
+                    <span>Module {index + 1}/{totalModules}</span>
                   </div>
                 </div>
               </div>

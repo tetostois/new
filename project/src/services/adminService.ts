@@ -91,6 +91,13 @@ export class AdminService {
   }
 
   /**
+   * Publier la correction d'une soumission au candidat
+   */
+  static async releaseSubmission(submissionId: string): Promise<{ success: boolean; message: string; submission: ExamSubmission }> {
+    return apiRequest(`/admin/exam-submissions/${submissionId}/release`, 'POST');
+  }
+
+  /**
    * Récupérer les examinateurs disponibles
    */
   static async getAvailableExaminers(): Promise<{ success: boolean; examiners: Examiner[] }> {

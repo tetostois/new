@@ -55,6 +55,12 @@ export const CandidateDashboard: React.FC = () => {
     setShowPayment(false);
     // Mise à jour du statut utilisateur
     user.hasPaid = true;
+    // Si paiement complet, supprimer toute restriction de module payé seul
+    try {
+      if (selectedCertification) {
+        localStorage.removeItem(`perModulePaid:${selectedCertification}`);
+      }
+    } catch {}
     // Rediriger vers les conditions d'examen avant la sélection des modules
     if (selectedCertification) {
       navigate(`/exam-conditions?cert=${encodeURIComponent(selectedCertification)}`);
@@ -64,6 +70,18 @@ export const CandidateDashboard: React.FC = () => {
   };
 
   const handleCertificationSelect = (certification: any) => {
+    // Interdire la modification une fois le paiement effectué
+    if (paymentCompleted) {
+      alert("Vous avez déjà réglé la certification. La modification n'est plus autorisée.");
+      setShowCertificationSelector(false);
+      return;
+    }
+    // Réinitialiser tout paiement par module précédent pour cette certification
+    try {
+      if (certification?.id) {
+        localStorage.removeItem(`perModulePaid:${certification.id}`);
+      }
+    } catch {}
     setSelectedCertification(certification.id);
     user.selectedCertification = certification.id;
     setShowCertificationSelector(false);
@@ -119,6 +137,17 @@ export const CandidateDashboard: React.FC = () => {
     return () => window.removeEventListener('moduleProgressUpdate', listener);
   }, []);
 
+  // Si le paiement est complété, fermer le sélecteur s'il est ouvert
+  useEffect(() => {
+    if (paymentCompleted && showCertificationSelector) {
+      setShowCertificationSelector(false);
+    }
+    // Nettoyer toute trace de paiement par module si paiement complet
+    if (paymentCompleted && selectedCertification) {
+      try { localStorage.removeItem(`perModulePaid:${selectedCertification}`); } catch {}
+    }
+  }, [paymentCompleted, showCertificationSelector]);
+
   // Charger les résultats (notes/commentaires) pour affichage de la correction
   useEffect(() => {
     (async () => {
@@ -145,6 +174,16 @@ export const CandidateDashboard: React.FC = () => {
     })();
   }, []);
 
+  const getPerModulePaid = (): string | null => {
+    if (!selectedCertification) return null;
+    try {
+      const key = `perModulePaid:${selectedCertification}`;
+      return localStorage.getItem(key);
+    } catch { return null; }
+  };
+
+  const perModulePaidModuleId = getPerModulePaid();
+
   const saveProfile = () => {
     // Simulation de la sauvegarde
     console.log('Profil mis à jour:', profileForm);
@@ -164,32 +203,38 @@ export const CandidateDashboard: React.FC = () => {
   };
 
   const hasCertificates = myCertificates.length > 0;
-  const hasCorrection = !!resultsData || user.score !== undefined;
+  const hasCorrection = Boolean(resultsData && Object.keys(resultsData || {}).length > 0);
+
+  const isPaidOrModulePaid = paymentCompleted || !!perModulePaidModuleId;
 
   const statusInfo = useMemo(() => {
-    if (!paymentCompleted) return { text: 'En attente de paiement', cls: 'text-gray-600' };
+    if (!isPaidOrModulePaid) return { text: 'En attente de paiement', cls: 'text-gray-600' };
     if (isExamActive) return { text: 'Examen en cours', cls: 'text-blue-600' };
     if (hasCertificates) return { text: 'Certifié', cls: 'text-green-600' };
     if (hasCorrection) return { text: 'Correction disponible', cls: 'text-green-600' };
     if (user.examTaken) return { text: 'En correction', cls: 'text-blue-600' };
     if (modulesCompletedCount > 0) return { text: 'Modules en cours', cls: 'text-blue-600' };
     return { text: 'Prêt pour modules', cls: 'text-orange-600' };
-  }, [paymentCompleted, isExamActive, hasCertificates, hasCorrection, user.examTaken, modulesCompletedCount]);
+  }, [isPaidOrModulePaid, isExamActive, hasCertificates, hasCorrection, user.examTaken, modulesCompletedCount]);
+
+  const targetModulesCount = (currentCertification?.modules?.length || 0) > 0
+    ? (perModulePaidModuleId ? 1 : (currentCertification?.modules?.length || 0))
+    : (perModulePaidModuleId ? 1 : 0);
 
   const steps = [
     {
       id: 'payment',
       title: 'Paiement',
       description: 'Régler les frais d\'examen',
-      completed: paymentCompleted,
-      current: !paymentCompleted
+      completed: isPaidOrModulePaid,
+      current: !isPaidOrModulePaid
     },
     {
       id: 'exam',
       title: 'Modules',
-      description: 'Compléter les 3 modules',
-      completed: modulesCompletedCount >= (currentCertification?.modules.length || 0),
-      current: paymentCompleted && !user.examTaken && !isExamActive
+      description: `Compléter ${targetModulesCount} module${targetModulesCount > 1 ? 's' : ''}`,
+      completed: modulesCompletedCount >= targetModulesCount,
+      current: isPaidOrModulePaid && !user.examTaken && !isExamActive
     },
     {
       id: 'correction',
@@ -284,23 +329,24 @@ export const CandidateDashboard: React.FC = () => {
         </Card>
 
         {/* Certification Progress */}
-        {currentCertification && paymentCompleted && (
+        {currentCertification && (paymentCompleted || !!perModulePaidModuleId) && (
           <ModuleProgress
             certification={currentCertification}
             completedModules={user.completedModules || []}
             unlockedModules={(user as any).unlockedModules || []}
             currentModule={user.currentModule}
+            restrictToModules={paymentCompleted ? undefined : (perModulePaidModuleId ? [perModulePaidModuleId] : undefined)}
             onStartModuleWithPayment={handleStartModuleWithPayment}
             onContinueModule={handleContinueModule}
             examStartDate={user.examStartDate}
-            hasPaid={paymentCompleted}
+            hasPaid={paymentCompleted || !!perModulePaidModuleId}
           />
         )}
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Main Content */}
           <div className="lg:col-span-2 space-y-6">
-            {!paymentCompleted && (
+            {(!paymentCompleted && !perModulePaidModuleId) && (
               <Card>
                 <div className="flex items-start space-x-4">
                   <div className="p-3 bg-orange-100 rounded-lg">
@@ -536,7 +582,7 @@ export const CandidateDashboard: React.FC = () => {
             <Card className='mt-6'>
               <div className="flex justify-between items-center mb-4">
                 <h3 className="font-semibold text-gray-900">Certification</h3>
-              {!paymentCompleted && (
+              {(!paymentCompleted && !perModulePaidModuleId) && (
                 <Button
                   size="sm"
                   variant="secondary"
@@ -800,8 +846,8 @@ export const CandidateDashboard: React.FC = () => {
               <PaymentForm 
                 amount={
                   selectedPaymentType === 'full' 
-                    ? (currentCertification?.price || 50000)
-                    : (currentCertification?.pricePerModule || 25000)
+                    ? (currentCertification?.price || 10)
+                    : (currentCertification?.pricePerModule || 10)
                 }
                 certificationType={selectedCertification || ''}
                 paymentType={selectedPaymentType}

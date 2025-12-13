@@ -115,9 +115,16 @@ class ExamSubmissionController extends Controller
             DB::beginTransaction();
 
             $submission = ExamSubmission::where('id', $id)
-                                        ->where('examiner_id', $examinerId)
-                                        ->where('status', 'under_review')
-                                        ->firstOrFail();
+                ->where('examiner_id', $examinerId)
+                ->whereIn('status', ['under_review','submitted'])
+                ->first();
+            if (!$submission) {
+                DB::rollBack();
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Soumission introuvable, non assignée, ou statut incompatible pour la notation.',
+                ], 404);
+            }
 
             // Plafonner chaque note au nombre de points de la question
             // Extraire certification_type et module_id depuis exam_id

@@ -190,7 +190,7 @@ export const ExaminerDashboard: React.FC = () => {
       
       // Préparer les données de notation
       const grades = Object.entries(scores).map(([questionId, score]) => ({
-        question_id: questionId,
+        question_id: String(questionId),
         score: score,
         feedback: feedback[questionId] || ''
       }));

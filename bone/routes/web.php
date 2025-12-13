@@ -19,3 +19,8 @@ Route::get('/mobile/campay/redirect', [CamPayController::class, 'redirect'])->na
 Route::get('/email/verify/{id}/{hash}', [EmailVerificationController::class, 'verify'])
     ->middleware(['signed', 'throttle:6,1'])
     ->name('verification.verify');
+
+// Page de test du formulaire de paiement
+Route::get('/payment', function () {
+    return view('payment.form');
+});

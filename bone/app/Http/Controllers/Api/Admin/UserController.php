@@ -213,6 +213,8 @@ class UserController extends Controller
             'specialization' => 'sometimes|nullable|string|max:150',
             'experience' => 'sometimes|nullable|string|max:500',
             'password'   => 'sometimes|nullable|string|min:6|confirmed',
+            // on n'expose pas selected_certification ici volontairement
+            'selected_certification' => 'prohibited',
         ]);
 
         if ($validator->fails()) {
@@ -220,6 +222,17 @@ class UserController extends Controller
         }
 
         $data = $validator->validated();
+        // Protection défensive: si un payload malicieux inclut selected_certification et que l'utilisateur a payé, interdire
+        if ($request->has('selected_certification')) {
+            if ($user->has_paid) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Changement de certification interdit après paiement',
+                ], 403);
+            }
+            // Sinon ignorer ce champ dans tous les cas côté admin update
+            unset($data['selected_certification']);
+        }
         // Mapper experience (texte libre) vers qualifications et éventuellement experience_years
         if (array_key_exists('experience', $data)) {
             $user->qualifications = $data['experience'];
