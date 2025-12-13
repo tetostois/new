@@ -6,6 +6,7 @@ import { PaymentForm } from '../components/payment/PaymentForm';
 import { useAuth } from '../contexts/AuthContext';
 import { useExam } from '../contexts/ExamContext';
 import { getCertificationById } from '../components/data/certifications';
+import apiRequest from '../config/api';
 import { mapCertificationToBackendSlug, mapModuleToBackendSlug } from '../utils/mapping';
 import { ModuleProgressService } from '../services/moduleProgressService';
 
@@ -19,6 +20,21 @@ const ModulePayment: React.FC = () => {
   // get selected certification from user
   const certificationId = user?.selectedCertification || '';
   const certification = getCertificationById(certificationId);
+  const [certPrices, setCertPrices] = useState<Record<string, { price?: number; price_per_module?: number }>>({});
+
+  const currentCertSlug = certification ? mapCertificationToBackendSlug(certification.id) : '';
+  const overridePricePerModule = currentCertSlug && certPrices[currentCertSlug]?.price_per_module != null
+    ? Number(certPrices[currentCertSlug]?.price_per_module)
+    : undefined;
+
+  React.useEffect(() => {
+    (async () => {
+      try {
+        const res: any = await apiRequest('/candidate/certification-prices', 'GET');
+        if (res?.success && res?.prices) setCertPrices(res.prices);
+      } catch {}
+    })();
+  }, []);
 
   if (!user || !certification) return <div>Chargement...</div>;
 
@@ -62,7 +78,7 @@ const ModulePayment: React.FC = () => {
               <p className="text-sm text-gray-600 mb-3">{m.description}</p>
               <div className="flex items-center justify-between mb-3">
                 <span className="text-sm text-gray-700">Prix:</span>
-                <span className="font-bold text-blue-600">{new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'XAF', minimumFractionDigits: 0 }).format(certification.pricePerModule || 0)}</span>
+                <span className="font-bold text-blue-600">{new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'XAF', minimumFractionDigits: 0 }).format((overridePricePerModule ?? certification.pricePerModule) || 0)}</span>
               </div>
               <Button onClick={() => handlePayAndStart(m.id)} className="w-full bg-green-600 hover:bg-green-700">Payer et commencer</Button>
             </Card>
@@ -79,7 +95,7 @@ const ModulePayment: React.FC = () => {
           <Card className="max-w-md w-full p-4">
             <h3 className="text-lg font-medium mb-3">Paiement - Module sélectionné</h3>
             <PaymentForm
-              amount={certification.pricePerModule || 0}
+              amount={(overridePricePerModule ?? certification.pricePerModule) || 0}
               certificationType={certification.id}
               paymentType={'per-module'}
               moduleId={selectedModule}

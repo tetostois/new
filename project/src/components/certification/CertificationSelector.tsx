@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Check, Clock, Users, Target, ArrowRight } from 'lucide-react';
 // import { CertificationType } from '../../types';
 // import { certificationTypes, getCertificationColor } from '../../data/certifications';
@@ -6,6 +6,8 @@ import { Card } from '../ui/Card';
 import { Button } from '../ui/Button';
 import { CertificationType } from '../../types';
 import { certificationTypes, getCertificationColor } from '../data/certifications';
+import apiRequest from '../../config/api';
+import { mapCertificationToBackendSlug } from '../../utils/mapping';
 
 interface CertificationSelectorProps {
   onSelect: (certification: CertificationType) => void;
@@ -17,6 +19,18 @@ export const CertificationSelector: React.FC<CertificationSelectorProps> = ({
   selectedCertification
 }) => {
   const [expandedCard, setExpandedCard] = useState<string | null>(null);
+  const [certPrices, setCertPrices] = useState<Record<string, { price?: number; price_per_module?: number }>>({});
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const res: any = await apiRequest('/candidate/certification-prices', 'GET');
+        if (res?.success && res?.prices && typeof res.prices === 'object') {
+          setCertPrices(res.prices);
+        }
+      } catch {}
+    })();
+  }, []);
 
   const formatPrice = (price: number) => {
     return new Intl.NumberFormat('fr-FR', {
@@ -85,6 +99,10 @@ export const CertificationSelector: React.FC<CertificationSelectorProps> = ({
           const colors = getColorClasses(cert.color);
           const isExpanded = expandedCard === cert.id;
           const isSelected = selectedCertification === cert.id;
+          const slug = mapCertificationToBackendSlug(cert.id);
+          const override = certPrices[slug] || {};
+          const price = (override.price ?? cert.price) as number;
+          const pricePerModule = (override.price_per_module ?? cert.pricePerModule) as number | undefined;
 
           return (
             <Card
@@ -121,11 +139,11 @@ export const CertificationSelector: React.FC<CertificationSelectorProps> = ({
 
                 <div className="flex items-center justify-between mb-4">
                   <div className="text-2xl font-bold text-gray-900">
-                    {formatPrice(cert.price)}
+                    {formatPrice(price)}
                   </div>
-                  {cert.pricePerModule && (
+                  {pricePerModule && (
                     <div className="text-sm text-gray-500">
-                      ou {formatPrice(cert.pricePerModule)}/module
+                      ou {formatPrice(pricePerModule)}/module
                     </div>
                   )}
                 </div>

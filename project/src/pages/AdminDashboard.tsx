@@ -12,6 +12,8 @@ import { Input } from '../components/ui/Input';
 import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
 import { AdminService } from '../services/adminService';
+import { certificationTypes } from '../components/data/certifications';
+import { mapCertificationToBackendSlug } from '../utils/mapping';
 import Pagination from '../components/Pagination';
 
 interface User {
@@ -261,6 +263,60 @@ export const AdminDashboard: React.FC = () => {
   const [loadingSubmissions, setLoadingSubmissions] = useState(false);
   const [submissionsError, setSubmissionsError] = useState<string | null>(null);
 
+  // Settings state
+  const [settings, setSettings] = useState<{ examWindowDays: number; certPrices?: Record<string, { price?: number; price_per_module?: number }> }>({ examWindowDays: 3, certPrices: {} });
+  const [savingSettings, setSavingSettings] = useState(false);
+
+  const loadSettings = async () => {
+    try {
+      const res = await fetch(`${API_BASE}/admin/settings`, {
+        headers: { Authorization: `Bearer ${getToken()}` }
+      });
+      if (!res.ok) return;
+      const data = await res.json();
+      const days = Number(data?.settings?.exam_window_days ?? 3);
+      const s: any = { examWindowDays: Number.isFinite(days) ? days : 3 };
+      // Charger les prix
+      try {
+        const res2 = await fetch(`${API_BASE}/admin/certification-prices`, {
+          headers: { Authorization: `Bearer ${getToken()}` }
+        });
+        if (res2.ok) {
+          const data2 = await res2.json();
+          if (data2?.prices && typeof data2.prices === 'object') {
+            s.certPrices = data2.prices;
+          }
+        }
+      } catch {}
+      setSettings(s);
+    } catch {}
+  };
+
+  const saveSettings = async () => {
+    try {
+      setSavingSettings(true);
+      const payload = { exam_window_days: settings.examWindowDays };
+      const res = await fetch(`${API_BASE}/admin/settings`, {
+        method: 'PUT',
+        headers: { 
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${getToken()}`
+        },
+        body: JSON.stringify(payload)
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        alert(err?.message || 'Erreur lors de l’enregistrement');
+        return;
+      }
+      alert('Paramètres enregistrés');
+    } catch {
+      alert('Erreur réseau lors de l’enregistrement');
+    } finally {
+      setSavingSettings(false);
+    }
+  };
+
   const loadUsers = async () => {
     try {
       const params = new URLSearchParams();
@@ -314,6 +370,7 @@ export const AdminDashboard: React.FC = () => {
 
   // Charger les soumissions d'examens au montage
   useEffect(() => { loadExamSubmissions(); }, []);
+  useEffect(() => { if (activeSection === 'settings') loadSettings(); }, [activeSection]);
 
   // Charger les soumissions d'examens
   const loadExamSubmissions = async () => {
@@ -2898,25 +2955,112 @@ export const AdminDashboard: React.FC = () => {
               <Card>
                 <h3 className="text-lg font-semibold text-gray-900 mb-4">Configuration de l'examen</h3>
                 <div className="space-y-4">
-                  <div>
+                  <div className="max-w-md">
                     <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Durée de l'examen (minutes)
+                      Durée limite globale de l'examen (en jours)
                     </label>
-                    <Input type="number" defaultValue="60" className="w-32" />
+                    <div className="flex items-center space-x-3">
+                      <Input
+                        type="number"
+                        min="1"
+                        max="60"
+                        value={settings.examWindowDays}
+                        onChange={(e) => setSettings(s => ({ ...s, examWindowDays: Number(e.target.value || 0) }))}
+                        className="w-32"
+                      />
+                      <Button onClick={saveSettings} disabled={savingSettings}>
+                        {savingSettings ? 'Enregistrement…' : 'Sauvegarder'}
+                      </Button>
+                    </div>
+                    <p className="text-xs text-gray-500 mt-2">
+                      S'applique aux examens démarrés après la modification.
+                    </p>
                   </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Prix de l'examen (FCFA)
-                    </label>
-                    <Input type="number" defaultValue="10" className="w-32" />
+
+                  <div className="mt-6">
+                    <h4 className="text-md font-semibold text-gray-900 mb-2">Prix des certifications</h4>
+                    <div className="overflow-x-auto border rounded-lg">
+                      <table className="min-w-full">
+                        <thead>
+                          <tr className="bg-gray-50">
+                            <th className="text-left px-3 py-2 text-sm font-medium text-gray-700">Certification</th>
+                            <th className="text-left px-3 py-2 text-sm font-medium text-gray-700">Prix (XAF)</th>
+                            <th className="text-left px-3 py-2 text-sm font-medium text-gray-700">Prix par module (XAF)</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {certificationTypes.map((c) => {
+                            const slug = mapCertificationToBackendSlug(c.id);
+                            const entry = (settings.certPrices || {})[slug] || {};
+                            const priceVal = (entry.price ?? c.price ?? 0) as number;
+                            const ppmVal = (entry.price_per_module ?? c.pricePerModule ?? 0) as number;
+                            return (
+                              <tr key={c.id} className="border-t">
+                                <td className="px-3 py-2 text-sm text-gray-900">{c.name}</td>
+                                <td className="px-3 py-2">
+                                  <Input
+                                    type="number"
+                                    value={priceVal}
+                                    onChange={(e) => {
+                                      const val = Number(e.target.value || 0);
+                                      setSettings(s => {
+                                        const next = { ...s };
+                                        next.certPrices = { ...(next.certPrices || {}) };
+                                        next.certPrices![slug] = { ...(next.certPrices![slug] || {}), price: val };
+                                        return next;
+                                      });
+                                    }}
+                                    className="w-40"
+                                  />
+                                </td>
+                                <td className="px-3 py-2">
+                                  <Input
+                                    type="number"
+                                    value={ppmVal}
+                                    onChange={(e) => {
+                                      const val = Number(e.target.value || 0);
+                                      setSettings(s => {
+                                        const next = { ...s };
+                                        next.certPrices = { ...(next.certPrices || {}) };
+                                        next.certPrices![slug] = { ...(next.certPrices![slug] || {}), price_per_module: val };
+                                        return next;
+                                      });
+                                    }}
+                                    className="w-40"
+                                  />
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                    <div className="mt-3">
+                      <Button onClick={async () => {
+                        try {
+                          setSavingSettings(true);
+                          const payload = { prices: settings.certPrices || {} };
+                          const res = await fetch(`${API_BASE}/admin/certification-prices`, {
+                            method: 'PUT',
+                            headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${getToken()}` },
+                            body: JSON.stringify(payload)
+                          });
+                          if (!res.ok) {
+                            const err = await res.json().catch(() => ({}));
+                            alert(err?.message || 'Erreur lors de la sauvegarde des prix');
+                            return;
+                          }
+                          alert('Prix enregistrés');
+                        } catch {
+                          alert('Erreur réseau lors de la sauvegarde');
+                        } finally {
+                          setSavingSettings(false);
+                        }
+                      }} disabled={savingSettings}>
+                        {savingSettings ? 'Enregistrement…' : 'Enregistrer les prix'}
+                      </Button>
+                    </div>
                   </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Score minimum pour certification
-                    </label>
-                    <Input type="number" defaultValue="70" className="w-32" />
-                  </div>
-                  <Button>Sauvegarder les paramètres</Button>
                 </div>
               </Card>
             </div>

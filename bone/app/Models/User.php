@@ -61,6 +61,8 @@ class User extends Authenticatable implements JWTSubject, MustVerifyEmailContrac
         'has_paid',
         'exam_terms_accepted_at',
         'exam_terms_certification_type',
+        'exam_start_at',
+        'exam_expires_at',
     ];
 
     /**
@@ -86,6 +88,8 @@ class User extends Authenticatable implements JWTSubject, MustVerifyEmailContrac
         'last_login_at' => 'datetime',
         'has_paid' => 'boolean',
         'exam_terms_accepted_at' => 'datetime',
+        'exam_start_at' => 'datetime',
+        'exam_expires_at' => 'datetime',
     ];
 
     /**

@@ -66,6 +66,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       selectedCertification: raw.selectedCertification ?? raw.selected_certification ?? undefined,
       examTermsAcceptedAt: raw.examTermsAcceptedAt ?? raw.exam_terms_accepted_at ?? undefined,
       examTermsAccepted: Boolean((raw.examTermsAcceptedAt ?? raw.exam_terms_accepted_at) ? true : false),
+      examStartDate: raw.examStartDate ?? raw.exam_start_at ?? undefined,
     } as User;
   };
 

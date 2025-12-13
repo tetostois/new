@@ -128,8 +128,17 @@ class ModuleProgressController extends Controller
         ]);
 
         $candidateId = auth()->id();
+        $user = auth()->user();
 
         try {
+            // Vérifier expiration de la fenêtre d'examen (3 jours)
+            if ($user && $user->exam_expires_at && now()->greaterThan($user->exam_expires_at)) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Fenêtre d\'examen expirée. Vous ne pouvez plus démarrer de module.',
+                ], 403);
+            }
+
             $progress = ModuleProgress::where('candidate_id', $candidateId)
                 ->where('certification_type', $validated['certification_type'])
                 ->where('module_id', $validated['module_id'])
@@ -147,6 +156,16 @@ class ModuleProgressController extends Controller
                     'success' => false,
                     'message' => 'Ce module est verrouillé',
                 ], 400);
+            }
+
+            // Démarrer la fenêtre d'examen si ce n'est pas déjà fait
+            if ($user && empty($user->exam_start_at)) {
+                // Utiliser la durée configurée par l'admin (par défaut 3 jours)
+                $days = (int) (\App\Models\AppSetting::get('exam_window_days', 3));
+                $days = $days > 0 ? $days : 3;
+                $user->exam_start_at = now();
+                $user->exam_expires_at = now()->addDays($days);
+                $user->save();
             }
 
             $progress->start();

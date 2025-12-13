@@ -10,6 +10,14 @@ class QuestionController extends Controller
 {
     public function index(Request $request)
     {
+        // Interdire après expiration de la fenêtre d'examen
+        $user = $request->user();
+        if ($user && $user->exam_expires_at && now()->greaterThan($user->exam_expires_at)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Fenêtre d\'examen expirée. Chargement des questions interdit.',
+            ], 403);
+        }
         // Accepter 'certification' ou 'certification_type' pour compatibilité
         $validated = $request->validate([
             'certification' => 'sometimes|string',

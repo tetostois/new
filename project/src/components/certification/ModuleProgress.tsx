@@ -6,6 +6,7 @@ import { Button } from '../ui/Button';
 import { CertificationModule, CertificationType } from '../../types';
 import { ModuleProgressService, ModuleProgressData } from '../../services/moduleProgressService';
 import { mapCertificationToBackendSlug, mapModuleToBackendSlug } from '../../utils/mapping';
+import apiRequest from '../../config/api';
 
 interface ModuleProgressProps {
   certification: CertificationType;
@@ -35,6 +36,8 @@ export const ModuleProgress: React.FC<ModuleProgressProps> = ({
   const [moduleProgress, setModuleProgress] = useState<ModuleProgressData[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [examStartAt, setExamStartAt] = useState<string | undefined>(examStartDate);
+  const [examExpiresAt, setExamExpiresAt] = useState<string | undefined>(undefined);
 
   // Modules visibles (restriction en cas de paiement par module)
   const visibleModules = (restrictToModules && restrictToModules.length > 0)
@@ -89,6 +92,38 @@ export const ModuleProgress: React.FC<ModuleProgressProps> = ({
     reloadProgress();
   }, [certification.id]);
 
+  // Charger/rafraîchir la fenêtre d'examen depuis le backend si elle n'est pas fournie
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      try {
+        // Si nous n'avons pas encore la fenêtre, tenter /auth/me
+        if (!examStartAt || !examExpiresAt) {
+          const me: any = await apiRequest('/auth/me', 'GET');
+          const start = me?.exam_start_at || me?.examStartAt;
+          const expires = me?.exam_expires_at || me?.examExpiresAt;
+          if (mounted) {
+            if (start) setExamStartAt(start);
+            if (expires) setExamExpiresAt(expires);
+          }
+        }
+      } catch {
+        // silencieux
+      }
+    })();
+    return () => { mounted = false; };
+  }, [examStartAt, examExpiresAt]);
+
+  // Mettre à jour l'affichage du compte à rebours chaque minute
+  useEffect(() => {
+    const id = window.setInterval(() => {
+      // forcer un re-render léger
+      setTick((t) => (t + 1) % 1000);
+    }, 60_000);
+    return () => window.clearInterval(id);
+  }, []);
+  const [tick, setTick] = useState(0);
+
   // Polling périodique supprimé pour améliorer l'expérience utilisateur
   // Le rechargement se fait maintenant uniquement via l'événement examSubmitted
 
@@ -131,6 +166,14 @@ export const ModuleProgress: React.FC<ModuleProgressProps> = ({
         certification_type: getCertificationSlug(),
         module_id: mapModuleToBackendSlug(moduleId)
       });
+
+      // Démarrer localement la fenêtre d'examen si non définie, pour afficher le compte à rebours sans rechargement
+      if (!examStartAt) {
+        const nowIso = new Date().toISOString();
+        setExamStartAt(nowIso);
+        const expires = new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString();
+        setExamExpiresAt(expires);
+      }
       
       // Démarrer directement le module dans le contexte d'examen
       startModule(certification.id, moduleId);
@@ -148,10 +191,11 @@ export const ModuleProgress: React.FC<ModuleProgressProps> = ({
   };
 
   const getTimeRemaining = () => {
-    if (!examStartDate) return null;
-    
-    const startDate = new Date(examStartDate);
-    const endDate = new Date(startDate.getTime() + 3 * 24 * 60 * 60 * 1000); // 3 jours
+    const startStr = examStartAt || examStartDate;
+    if (!startStr) return null;
+
+    const startDate = new Date(startStr);
+    const endDate = examExpiresAt ? new Date(examExpiresAt) : new Date(startDate.getTime() + 3 * 24 * 60 * 60 * 1000); // 3 jours
     const now = new Date();
     const remaining = endDate.getTime() - now.getTime();
     

@@ -24,9 +24,18 @@ class ExamSubmissionController extends Controller
         ]);
 
         $candidateId = auth()->id();
+        $user = auth()->user();
 
         try {
             DB::beginTransaction();
+
+            // Bloquer la soumission manuelle après expiration (soumission auto via scheduler)
+            if ($user && $user->exam_expires_at && now()->greaterThan($user->exam_expires_at)) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Fenêtre d\'examen expirée. La soumission sera effectuée automatiquement.',
+                ], 403);
+            }
 
             // Récupérer ou créer la soumission d'examen
             $submission = ExamSubmission::where('exam_id', $validated['exam_id'])

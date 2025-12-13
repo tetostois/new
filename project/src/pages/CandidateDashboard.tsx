@@ -50,14 +50,37 @@ export const CandidateDashboard: React.FC = () => {
     maxDuration?: number;
     minQuestions?: number;
     maxQuestions?: number;
+    totalQuestions?: number;
     hasQcm?: boolean;
     hasText?: boolean;
   }>({});
+  const [certPrices, setCertPrices] = useState<Record<string, { price?: number; price_per_module?: number }>>({});
 
 
   if (!user) return null;
 
   const currentCertification = selectedCertification ? getCertificationById(selectedCertification) : null;
+
+  // Charger les prix dinámique depuis le backend
+  useEffect(() => {
+    (async () => {
+      try {
+        const res: any = await apiRequest('/candidate/certification-prices', 'GET');
+        if (res?.success && res?.prices && typeof res.prices === 'object') {
+          setCertPrices(res.prices);
+        }
+      } catch {}
+    })();
+  }, []);
+
+  const getCertSlug = (id?: string) => id ? mapCertificationToBackendSlug(id) : '';
+  const currentCertSlug = getCertSlug(currentCertification?.id);
+  const overridePrice = currentCertSlug && certPrices[currentCertSlug]?.price != null
+    ? Number(certPrices[currentCertSlug]?.price)
+    : undefined;
+  const overridePricePerModule = currentCertSlug && certPrices[currentCertSlug]?.price_per_module != null
+    ? Number(certPrices[currentCertSlug]?.price_per_module)
+    : undefined;
 
   // Charger dynamiquement les stats module depuis les questions publiées (admin)
   useEffect(() => {
@@ -95,7 +118,8 @@ export const CandidateDashboard: React.FC = () => {
         const maxDuration = durations.length ? Math.max(...durations) : undefined;
         const minQuestions = questions.length ? Math.min(...questions) : undefined;
         const maxQuestions = questions.length ? Math.max(...questions) : undefined;
-        setModuleStats({ minDuration, maxDuration, minQuestions, maxQuestions, hasQcm, hasText });
+        const totalQuestions = questions.reduce((sum, n) => sum + (Number.isFinite(n) ? n : 0), 0);
+        setModuleStats({ minDuration, maxDuration, minQuestions, maxQuestions, totalQuestions, hasQcm, hasText });
       } catch {
         setModuleStats({});
       }
@@ -460,7 +484,7 @@ export const CandidateDashboard: React.FC = () => {
                               style: 'currency',
                               currency: 'XAF',
                               minimumFractionDigits: 0
-                            }).format(currentCertification.price)}
+                            }).format(overridePrice ?? currentCertification.price)}
                           </span>
                         </div>
                         {currentCertification.pricePerModule && (
@@ -477,7 +501,7 @@ export const CandidateDashboard: React.FC = () => {
                                     style: 'currency',
                                     currency: 'XAF',
                                     minimumFractionDigits: 0
-                                  }).format(currentCertification.price)}</span>
+                                  }).format(overridePrice ?? currentCertification.price)}</span>
                                 </div>
                                 <p className="text-xs text-blue-700">Accès à tous les modules</p>
                               </button>
@@ -491,7 +515,7 @@ export const CandidateDashboard: React.FC = () => {
                                     style: 'currency',
                                     currency: 'XAF',
                                     minimumFractionDigits: 0
-                                  }).format(currentCertification.pricePerModule)}</span>
+                                  }).format(overridePricePerModule ?? currentCertification.pricePerModule)}</span>
                                 </div>
                                 <p className="text-xs text-blue-700">Payez module par module</p>
                               </button>
@@ -686,7 +710,7 @@ export const CandidateDashboard: React.FC = () => {
                       style: 'currency',
                       currency: 'XAF',
                       minimumFractionDigits: 0
-                    }).format(currentCertification.price)}
+                    }).format(overridePrice ?? currentCertification.price)}
                   </p>
                 </div>
               )}
@@ -779,14 +803,11 @@ export const CandidateDashboard: React.FC = () => {
                   </span>
                 </div>
                 <div className="flex justify-between text-sm">
-                  <span className="text-gray-600">Questions pour ce module :</span>
+                  <span className="text-gray-600">Questions pour cette certification :</span>
                   <span className="font-medium">
-                    {(() => {
-                      const minQ = moduleStats.minQuestions ?? 0;
-                      const maxQ = moduleStats.maxQuestions ?? 0;
-                      if (!minQ && !maxQ) return '—';
-                      return minQ === maxQ ? `${minQ} questions` : `${minQ}-${maxQ} questions`;
-                    })()}
+                    {moduleStats.totalQuestions && moduleStats.totalQuestions > 0
+                      ? `${moduleStats.totalQuestions} questions`
+                      : '—'}
                   </span>
                 </div>
                 <div className="flex justify-between text-sm">
@@ -955,8 +976,8 @@ export const CandidateDashboard: React.FC = () => {
               <PaymentForm 
                 amount={
                   selectedPaymentType === 'full' 
-                    ? (currentCertification?.price || 10)
-                    : (currentCertification?.pricePerModule || 10)
+                    ? ((overridePrice ?? currentCertification?.price) || 10)
+                    : ((overridePricePerModule ?? currentCertification?.pricePerModule) || 10)
                 }
                 certificationType={selectedCertification || ''}
                 paymentType={selectedPaymentType}

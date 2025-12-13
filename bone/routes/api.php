@@ -15,6 +15,7 @@ use App\Http\Controllers\Api\EmailVerificationController;
 use App\Http\Controllers\Api\CertificateController;
 use App\Http\Controllers\Api\Candidate\ProfileController as CandidateProfileController;
 use App\Http\Controllers\Api\Candidate\TermsController as CandidateTermsController;
+use App\Http\Controllers\Api\Admin\SettingsController as AdminSettingsController;
 
 // Routes publiques (sans authentification)
 Route::post('/auth/register', [AuthController::class, 'register']);
@@ -62,6 +63,12 @@ Route::middleware('auth:api')->group(function () {
         // Certificats envoyés à ce candidat
         Route::get('/certificates', [CertificateController::class, 'listForCandidate']);
         Route::get('/certificates/download/{certType}', [CertificateController::class, 'downloadForCandidate']);
+        // Prix des certifications (lecture seule)
+        Route::get('/certification-prices', function () {
+            $map = \App\Models\AppSetting::get('certification_prices', []);
+            if (!is_array($map)) $map = [];
+            return response()->json(['success' => true, 'prices' => $map]);
+        });
         
         // Soumission d'examens
         Route::post('/exam-submissions/submit', [ExamSubmissionController::class, 'submit']);
@@ -88,6 +95,11 @@ Route::middleware('auth:api')->group(function () {
         Route::post('/questions', [AdminQuestionController::class, 'store']);
         Route::put('/questions/{id}', [AdminQuestionController::class, 'update']);
         Route::delete('/questions/{id}', [AdminQuestionController::class, 'destroy']);
+        // Paramètres applicatifs
+        Route::get('/settings', [AdminSettingsController::class, 'index']);
+        Route::put('/settings', [AdminSettingsController::class, 'update']);
+        Route::get('/certification-prices', [AdminSettingsController::class, 'certificationPrices']);
+        Route::put('/certification-prices', [AdminSettingsController::class, 'updateCertificationPrices']);
 
         // Publication d'examen (certification/module)
         Route::post('/exams/publish', [PublishExamController::class, 'publish']);
