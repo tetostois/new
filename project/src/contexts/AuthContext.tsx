@@ -61,6 +61,11 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       // champs facultatifs connus dans l'app
       specialization: raw.specialization ?? undefined,
       experience: raw.experience ?? undefined,
+      // champs utilisés par le flux d'examen
+      hasPaid: Boolean(raw.hasPaid ?? raw.has_paid ?? false),
+      selectedCertification: raw.selectedCertification ?? raw.selected_certification ?? undefined,
+      examTermsAcceptedAt: raw.examTermsAcceptedAt ?? raw.exam_terms_accepted_at ?? undefined,
+      examTermsAccepted: Boolean((raw.examTermsAcceptedAt ?? raw.exam_terms_accepted_at) ? true : false),
     } as User;
   };
 

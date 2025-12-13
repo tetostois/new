@@ -22,6 +22,9 @@ export interface User {
   unlockedModules?: string[];
   currentModule?: string;
   examStartDate?: string;
+  // Acceptation des conditions d'examen (serveur)
+  examTermsAcceptedAt?: string;
+  examTermsAccepted?: boolean;
   specialization?: string;
   experience?: string;
 }

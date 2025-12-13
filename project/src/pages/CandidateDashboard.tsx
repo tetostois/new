@@ -50,11 +50,25 @@ export const CandidateDashboard: React.FC = () => {
 
   const currentCertification = selectedCertification ? getCertificationById(selectedCertification) : null;
 
-  const handlePaymentSuccess = () => {
+  const handlePaymentSuccess = async () => {
     setPaymentCompleted(true);
     setShowPayment(false);
     // Mise à jour du statut utilisateur
     user.hasPaid = true;
+    // Persister le paiement côté serveur (flux simulé)
+    try {
+      await apiRequest('/candidate/mark-paid', 'POST');
+      try {
+        const saved = localStorage.getItem('user');
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          parsed.hasPaid = true;
+          localStorage.setItem('user', JSON.stringify(parsed));
+        }
+      } catch {}
+    } catch (e) {
+      console.warn('Impossible de persister le paiement côté serveur:', e);
+    }
     // Si paiement complet, supprimer toute restriction de module payé seul
     try {
       if (selectedCertification) {
@@ -69,7 +83,7 @@ export const CandidateDashboard: React.FC = () => {
     }
   };
 
-  const handleCertificationSelect = (certification: any) => {
+  const handleCertificationSelect = async (certification: any) => {
     // Interdire la modification une fois le paiement effectué
     if (paymentCompleted) {
       alert("Vous avez déjà réglé la certification. La modification n'est plus autorisée.");
@@ -82,9 +96,27 @@ export const CandidateDashboard: React.FC = () => {
         localStorage.removeItem(`perModulePaid:${certification.id}`);
       }
     } catch {}
-    setSelectedCertification(certification.id);
-    user.selectedCertification = certification.id;
-    setShowCertificationSelector(false);
+    // Persister côté serveur la certification
+    try {
+      await apiRequest('/candidate/certification', 'PUT', {
+        selected_certification: certification.id
+      });
+      setSelectedCertification(certification.id);
+      user.selectedCertification = certification.id;
+      try {
+        const saved = localStorage.getItem('user');
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          parsed.selectedCertification = certification.id;
+          localStorage.setItem('user', JSON.stringify(parsed));
+        }
+      } catch {}
+    } catch (e) {
+      alert("Impossible d'enregistrer la certification. Réessayez.");
+      return;
+    } finally {
+      setShowCertificationSelector(false);
+    }
   };
 
 
