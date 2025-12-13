@@ -66,4 +66,28 @@ class ProfileController extends Controller
             'user' => $user,
         ]);
     }
+
+    /**
+     * Marquer le candidat comme ayant payé (utilisé par le flux de paiement simulé).
+     */
+    public function markPaid(Request $request): JsonResponse
+    {
+        $user = auth('api')->user();
+        if (!$user) {
+            return response()->json(['success' => false, 'message' => 'Non authentifié'], 401);
+        }
+        if (!$user->isCandidate()) {
+            return response()->json(['success' => false, 'message' => 'Réservé aux candidats'], 403);
+        }
+
+        // Marquer le paiement comme effectué
+        $user->has_paid = true;
+        $user->save();
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Statut de paiement mis à jour',
+            'user' => $user,
+        ]);
+    }
 }

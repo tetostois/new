@@ -14,6 +14,7 @@ use App\Http\Controllers\Api\Payment\CamPayController;
 use App\Http\Controllers\Api\EmailVerificationController;
 use App\Http\Controllers\Api\CertificateController;
 use App\Http\Controllers\Api\Candidate\ProfileController as CandidateProfileController;
+use App\Http\Controllers\Api\Candidate\TermsController as CandidateTermsController;
 
 // Routes publiques (sans authentification)
 Route::post('/auth/register', [AuthController::class, 'register']);
@@ -57,6 +58,7 @@ Route::middleware('auth:api')->group(function () {
         Route::post('/module-progress/complete', [ModuleProgressController::class, 'complete']);
         // Mise à jour du type de certification (verrouillée après paiement)
         Route::put('/certification', [CandidateProfileController::class, 'updateCertification']);
+        Route::post('/mark-paid', [CandidateProfileController::class, 'markPaid']);
         // Certificats envoyés à ce candidat
         Route::get('/certificates', [CertificateController::class, 'listForCandidate']);
         Route::get('/certificates/download/{certType}', [CertificateController::class, 'downloadForCandidate']);
@@ -69,6 +71,8 @@ Route::middleware('auth:api')->group(function () {
         // Résultats des examens
         Route::get('/results', [\App\Http\Controllers\Api\Candidate\ResultsController::class, 'index']);
         Route::get('/results/{moduleId}', [\App\Http\Controllers\Api\Candidate\ResultsController::class, 'show']);
+        // Acceptation des conditions d'examen
+        Route::post('/terms/accept', [CandidateTermsController::class, 'accept']);
     });
 
     // Administration (protégé par rôle admin)
