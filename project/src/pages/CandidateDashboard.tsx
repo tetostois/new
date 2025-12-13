@@ -12,6 +12,7 @@ import { Input } from '../components/ui/Input';
 import { getCertificationById } from '../components/data/certifications';
 import { ResultsService } from '../services/resultsService';
 import apiRequest, { API_BASE_URL } from '../config/api';
+import { mapCertificationToBackendSlug, mapModuleToBackendSlug } from '../utils/mapping';
 
 
 export const CandidateDashboard: React.FC = () => {
@@ -44,11 +45,62 @@ export const CandidateDashboard: React.FC = () => {
   const [modulesCompletedCount, setModulesCompletedCount] = useState(0);
   const [myCertificates, setMyCertificates] = useState<Array<{ candidate_id: string; candidate_name: string; certification_type: string; url: string; sent_at?: string }>>([]);
   const [resultsData, setResultsData] = useState<any>(null);
+  const [moduleStats, setModuleStats] = useState<{
+    minDuration?: number;
+    maxDuration?: number;
+    minQuestions?: number;
+    maxQuestions?: number;
+    hasQcm?: boolean;
+    hasText?: boolean;
+  }>({});
 
 
   if (!user) return null;
 
   const currentCertification = selectedCertification ? getCertificationById(selectedCertification) : null;
+
+  // Charger dynamiquement les stats module depuis les questions publiées (admin)
+  useEffect(() => {
+    (async () => {
+      try {
+        if (!currentCertification) {
+          setModuleStats({});
+          return;
+        }
+        const certSlug = mapCertificationToBackendSlug(currentCertification.id);
+        const modules = currentCertification.modules || [];
+        if (!modules.length) {
+          setModuleStats({});
+          return;
+        }
+        const results = await Promise.all(modules.map(async (m) => {
+          const moduleSlug = mapModuleToBackendSlug(m.id);
+          try {
+            const res: any = await apiRequest(`/candidate/questions?certification_type=${encodeURIComponent(certSlug)}&module=${encodeURIComponent(moduleSlug)}`, 'GET');
+            const list = Array.isArray(res?.questions) ? res.questions : [];
+            const numQuestions = list.length;
+            const totalSeconds = list.reduce((sum: number, q: any) => sum + Number(q?.time_limit ?? 60), 0);
+            const hasQcm = list.some((q: any) => String(q?.question_type || '').toLowerCase() === 'qcm');
+            const hasText = list.some((q: any) => String(q?.question_type || '').toLowerCase() === 'free_text');
+            return { numQuestions, totalSeconds, hasQcm, hasText };
+          } catch {
+            return { numQuestions: 0, totalSeconds: Number(m.duration ?? 60) * 60, hasQcm: true, hasText: true };
+          }
+        }));
+        const durations = results.map(r => Math.max(1, Math.ceil(r.totalSeconds / 60)));
+        const questions = results.map(r => r.numQuestions);
+        const hasQcm = results.some(r => r.hasQcm);
+        const hasText = results.some(r => r.hasText);
+        const minDuration = durations.length ? Math.min(...durations) : undefined;
+        const maxDuration = durations.length ? Math.max(...durations) : undefined;
+        const minQuestions = questions.length ? Math.min(...questions) : undefined;
+        const maxQuestions = questions.length ? Math.max(...questions) : undefined;
+        setModuleStats({ minDuration, maxDuration, minQuestions, maxQuestions, hasQcm, hasText });
+      } catch {
+        setModuleStats({});
+      }
+    })();
+  }, [currentCertification?.id]);
 
   const handlePaymentSuccess = async () => {
     setPaymentCompleted(true);
@@ -716,20 +768,45 @@ export const CandidateDashboard: React.FC = () => {
               <h3 className="font-semibold text-gray-900 mb-4">Détails des modules</h3>
               <div className="space-y-3">
                 <div className="flex justify-between text-sm">
-                  <span className="text-gray-600">Durée par module :</span>
-                  <span className="font-medium">60 minutes</span>
+                  <span className="text-gray-600">Durée pour ce module :</span>
+                  <span className="font-medium">
+                    {(() => {
+                      const minD = moduleStats.minDuration;
+                      const maxD = moduleStats.maxDuration;
+                      if (!minD || !maxD) return currentCertification ? '—' : '—';
+                      return minD === maxD ? `${minD} minutes` : `${minD}-${maxD} minutes`;
+                    })()}
+                  </span>
                 </div>
                 <div className="flex justify-between text-sm">
-                  <span className="text-gray-600">Questions par module :</span>
-                  <span className="font-medium">20 questions</span>
+                  <span className="text-gray-600">Questions pour ce module :</span>
+                  <span className="font-medium">
+                    {(() => {
+                      const minQ = moduleStats.minQuestions ?? 0;
+                      const maxQ = moduleStats.maxQuestions ?? 0;
+                      if (!minQ && !maxQ) return '—';
+                      return minQ === maxQ ? `${minQ} questions` : `${minQ}-${maxQ} questions`;
+                    })()}
+                  </span>
                 </div>
                 <div className="flex justify-between text-sm">
                   <span className="text-gray-600">Score minimum :</span>
-                  <span className="font-medium">70/100</span>
+                  <span className="font-medium">
+                    {(currentCertification?.minScore ?? 70)}/100
+                  </span>
                 </div>
                 <div className="flex justify-between text-sm">
                   <span className="text-gray-600">Format :</span>
-                  <span className="font-medium">QCM + Texte libre</span>
+                  <span className="font-medium">
+                    {(() => {
+                      const hasQcm = moduleStats.hasQcm;
+                      const hasText = moduleStats.hasText;
+                      if (hasQcm && hasText) return 'QCM + Texte libre';
+                      if (hasQcm) return 'QCM';
+                      if (hasText) return 'Texte libre';
+                      return currentCertification?.format || 'QCM + Texte libre';
+                    })()}
+                  </span>
                 </div>
                 <div className="flex justify-between text-sm">
                   <span className="text-gray-600">Prix :</span>

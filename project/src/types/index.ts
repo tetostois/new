@@ -46,6 +46,10 @@ export interface CertificationType {
   description: string;
   price: number;
   pricePerModule?: number;
+  // Métadonnées pour affichage dynamique
+  minScore?: number; // score minimum sur 100
+  questionCount?: number; // nombre de questions par module
+  format?: string; // ex: "QCM + Texte libre"
   targetAudience: string;
   objective: string;
   color: string;
