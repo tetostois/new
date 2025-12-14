@@ -151,7 +151,7 @@ class CertificateController extends Controller
                 'date' => now()->format('d/m/Y'),
                 'id_number' => 'ID-' . strtoupper($certType) . '-' . $candidateId,
             ];
-            $pdf = Pdf::loadView('certificates.certificate', $data);
+            $pdf = Pdf::loadView('certificates.certificate', $data)->setPaper('a4', 'landscape');
             $path = 'certificates/' . $candidateId . '-' . $certType . '-' . now()->format('YmdHis') . '.pdf';
             Storage::disk('public')->put($path, $pdf->output());
             $generated[] = $path;
@@ -172,7 +172,7 @@ class CertificateController extends Controller
             'id_number' => 'ID-' . strtoupper($certType) . '-' . $candidateId,
         ];
 
-        $pdf = Pdf::loadView('certificates.certificate', $data);
+        $pdf = Pdf::loadView('certificates.certificate', $data)->setPaper('a4', 'landscape');
         return $pdf->download("certificate-{$candidateId}-{$certType}.pdf");
     }
 
@@ -233,7 +233,7 @@ class CertificateController extends Controller
                 'date' => now()->format('d/m/Y'),
                 'id_number' => 'ID-' . strtoupper($certType) . '-' . $candidateId,
             ];
-            $pdf = Pdf::loadView('certificates.certificate', $data);
+            $pdf = Pdf::loadView('certificates.certificate', $data)->setPaper('a4', 'landscape');
             $path = 'certificates/' . $candidateId . '-' . $certType . '-' . now()->format('YmdHis') . '.pdf';
             Storage::disk('public')->put($path, $pdf->output());
             $existing = $path;

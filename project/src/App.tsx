@@ -10,6 +10,8 @@ import { AdminDashboard } from './pages/AdminDashboard';
 import { ExamInterface } from './components/exam/ExamInterface';
 import APropos from './pages/APropos';
 import ModulePayment from './pages/ModulePayment';
+import ForgotPassword from './pages/ForgotPassword';
+import ResetPassword from './pages/ResetPassword';
 import ExamConditions from './pages/ExamConditions';
 
 const AppContent: React.FC = () => {
@@ -25,6 +27,8 @@ const AppContent: React.FC = () => {
     return (
       <Routes>
         <Route path="/a-propos" element={<APropos />} />
+        <Route path="/forgot-password" element={<ForgotPassword />} />
+        <Route path="/reset-password" element={<ResetPassword />} />
         <Route path="*" element={<LandingPage />} />
       </Routes>
     );

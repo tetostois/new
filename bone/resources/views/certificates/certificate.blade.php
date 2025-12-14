@@ -3,27 +3,39 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Certificat</title>
+    <title>Attestation de Certification</title>
     <style>
-        body { font-family: DejaVu Sans, sans-serif; background:#f3f4f6; margin:0; padding:32px; }
-        .certificate { max-width: 1000px; margin: 0 auto; background:#fff; box-shadow:0 10px 25px rgba(0,0,0,.15); }
-        .header { background:#ca8a04; color:#111; padding:24px 40px; display:flex; align-items:center; justify-content:space-between; }
-        .qr { width:120px; height:120px; background:#fff; display:flex; align-items:center; justify-content:center; }
-        .titleBox { text-align:center; flex:1; padding:0 24px; }
-        .title { font-size:40px; font-weight:800; letter-spacing:4px; margin:0; text-transform:uppercase; }
-        .subtitle { font-size:14px; letter-spacing:4px; text-transform:uppercase; margin:6px 0 0 0; color:#1f2937; }
-        .body { padding:48px 48px 40px; text-align:center; }
-        .logoCircle { width:192px; height:192px; border-radius:9999px; border:16px solid #d1d5db; display:flex; align-items:center; justify-content:center; margin:0 auto 32px; }
-        .muted { color:#6b7280; font-size:12px; letter-spacing:3px; text-transform:uppercase; }
-        .name { font-size:44px; font-weight:800; letter-spacing:2px; text-transform:uppercase; margin:16px 0 24px; }
-        .certName { font-size:30px; font-weight:800; margin:18px 0 0; text-transform:capitalize; }
-        .verify { margin-top:40px; color:#6b7280; font-size:13px; }
-        .verify b { color:#374151; }
-        .footer { background:#ca8a04; padding:18px 40px; display:flex; justify-content:space-between; align-items:flex-end; color:#111; }
-        .footer .col { text-align:center; }
-        .footer .label { font-size:10px; letter-spacing:3px; text-transform:uppercase; margin-top:4px; }
-        .btnPrint { display:inline-block; background:#ca8a04; color:#fff; padding:12px 28px; border-radius:8px; text-decoration:none; margin-top:24px; }
-        @media print { body { padding:0; background:#fff; } .btnPrint, .no-print { display:none; } }
+        /* Format fixe 3300x2550 px (≈ Letter landscape @300dpi) */
+        @page { size: 3300px 2550px; margin: 0; }
+        html, body { width: 3300px; height: 2550px; margin: 0; padding: 0; background:#ffffff; font-family: DejaVu Sans, sans-serif; }
+        .sheet { width: 3300px; height: 2550px; margin: 0; padding: 0; box-sizing: border-box; overflow: hidden; }
+
+        /* Cadre en pixels */
+        .frame { border: 120px solid #2f5e2f; padding: 40px; width: 100%; height: 100%; box-sizing: border-box; }
+        .inner-frame { border: 60px solid #a3b18a; padding: 40px; width: 100%; height: 100%; box-sizing: border-box; }
+        .content-frame { border: 8px solid #1f2937; padding: 60px 50px; width: 100%; height: 100%; box-sizing: border-box; position: relative; }
+
+        /* Mise en page */
+        .top-badge { text-align:center; margin-bottom: 30px; }
+        .badge { width: 140px; height: 140px; object-fit: contain; }
+        .title { text-align:center; font-size: 74px; letter-spacing: 12px; color:#111827; text-transform: uppercase; margin: 0 0 20px 0; }
+        .title-line { width: 70%; height: 2px; background:#777; margin: 16px auto 24px auto; }
+        .subtitle-muted { text-align:center; color:#374151; font-size: 32px; margin: 0 0 18px 0; }
+        .candidate { text-align:center; color:#1b4332; font-size: 56px; letter-spacing: 4px; text-transform: uppercase; margin: 6px 0; font-weight: 700; }
+        .candidate-underline { width: 35%; height: 3px; background:#1b4332; margin: 14px auto 18px auto; }
+        .cert-text { text-align:center; color:#111827; font-size: 40px; margin-top: 18px; }
+        .brand { text-align:center; margin-top: 18px; }
+        .brand img { height: 120px; object-fit: contain; }
+
+        .sign-row { margin-top: 26px; display:flex; align-items:flex-end; justify-content:center; gap: 120px; }
+        .sign-col { text-align:center; width: 400px; }
+        .sign-line { width: 380px; height: 2px; background:#6b7280; margin: 10px auto 6px auto; }
+        .sign-label { font-size: 28px; color:#374151; }
+
+        .date-box { position:absolute; right: 50px; bottom: 40px; text-align: right; }
+        .date-box .label { text-transform: uppercase; font-size: 24px; letter-spacing: 2px; margin-top: 6px; color:#374151; }
+
+        @media print { .no-print { display:none; } }
     </style>
 </head>
 <body>
@@ -57,12 +69,12 @@
     ];
 
     $authorized = isset($authorized_expert) && is_object($authorized_expert) ? $authorized_expert : (object) [
-        'name' => 'Moufid Karray',
-        'phone' => '+1 438 992 5560'
+        'name' => 'Signature',
+        'phone' => ''
     ];
 
     $logo = $logo_path ?? null;
-    // Prépare une Data URI du logo (priorité: storage/$logo, sinon public/favicon.ico)
+    // Prépare une Data URI du logo (priorité: storage/$logo, sinon tentative programme leadership, puis favicon)
     $logoFilePath = null;
     if (!empty($logo)) {
         $candidateLogoPath = storage_path('app/public/' . ltrim($logo, '/'));
@@ -71,7 +83,16 @@
         }
     }
     if (!$logoFilePath) {
-        $fallback = public_path('favicon.ico');
+        $fallbackCandidates = [
+            public_path('images/04.png'), // logo fourni
+            public_path('logoprogrammeleadership.png'),
+            public_path('logo.png'),
+            public_path('favicon.ico'),
+        ];
+        $fallback = null;
+        foreach ($fallbackCandidates as $candPath) {
+            if (file_exists($candPath)) { $fallback = $candPath; break; }
+        }
         if (file_exists($fallback)) {
             $logoFilePath = $fallback;
         }
@@ -83,67 +104,71 @@
         $logoDataUri = 'data:' . $mime . ';base64,' . base64_encode(file_get_contents($logoFilePath));
     }
 
+    // Image du haut (badge) spécifique
+    $badgeDataUri = null;
+    $badgePath = public_path('images/05.png');
+    if (file_exists($badgePath) && is_readable($badgePath)) {
+        $badgeDataUri = 'data:image/png;base64,' . base64_encode(file_get_contents($badgePath));
+    }
+
     $website = config('app.website', config('app.url'));
 @endphp
 
-<div class="certificate">
-    <div class="header">
-        <div style="width:128px; display:flex; align-items:center; justify-content:center;">
-            @if($logoDataUri)
-                <img src="{{ $logoDataUri }}" alt="Logo" style="width:96px;height:96px;object-fit:contain;"/>
-            @else
-                <div class="logoCircle" style="width:96px;height:96px;border-width:8px;">
-                    <div style="text-align:center;">
-                        <div style="color:#dc2626;font-size:24px;margin-bottom:4px;">🍁</div>
-                        <div style="color:#2563eb;font-weight:700;font-size:14px;">ICC</div>
+<div class="sheet">
+  <div class="frame">
+    <div class="inner-frame">
+      <div class="content-frame">
+
+      <div class="top-badge">
+        @if($badgeDataUri)
+          <img class="badge" src="{{ $badgeDataUri }}" alt="Logo">
+        @elseif($logoDataUri)
+          <img class="badge" src="{{ $logoDataUri }}" alt="Logo">
+        @endif
+      </div>
+
+      <div class="title">ATTESTATION DE CERTIFICATION</div>
+      <div class="title-line"></div>
+
+      <div class="subtitle-muted">Cette attestation est attribuée à</div>
+      <div class="candidate">{{ strtoupper(trim(($cand->first_name ?? '') . ' ' . ($cand->last_name ?? ''))) }}</div>
+      <div class="candidate-underline"></div>
+
+      <div class="subtitle-muted" style="margin-top:8mm;">
+        Par sa participation brillante à la certification en tant que Chef d’Entreprise à
                     </div>
+      <div class="cert-text" style="font-weight:700; text-transform:uppercase;">
+        {{ mb_strtoupper($cert->type->name ?? $cert->certification_type) }}
                 </div>
+
+      <div class="brand">
+        @if($logoDataUri)
+          <img src="{{ $logoDataUri }}" alt="Programme Leadership">
             @endif
         </div>
-        <div class="titleBox">
-            <h1 class="title">Certificat de Réussite</h1>
-            <p class="subtitle">Délivré par International Consulting Canada</p>
+
+      <div class="sign-row">
+        <div class="sign-col">
+          <div class="sign-line"></div>
+          <div class="sign-label">Signature autorisée</div>
         </div>
-        <div class="qr">
-            @if($cert->qr_code_path)
-                <img src="{{ asset('storage/' . $cert->qr_code_path) }}" alt="QR Code" style="width:100%;height:100%;object-fit:contain;"/>
-            @else
-                <div style="width:100%;height:100%;background:#fff;color:#6b7280;font-size:12px;display:flex;align-items:center;justify-content:center;border:1px solid #e5e7eb;">QR CODE</div>
-            @endif
+        <div class="sign-col">
+          <div class="sign-line"></div>
+          <div class="sign-label">Cachet / Tampon</div>
         </div>
     </div>
 
-    <div class="body">
-        <p class="muted" style="margin-bottom:18px;">Certifie que</p>
-        <div class="name">{{ strtoupper(trim(($cand->first_name ?? '') . ' ' . ($cand->last_name ?? ''))) }}</div>
-        <p class="muted" style="margin-bottom:12px;">a satisfait aux exigences pour l'obtention de la certification</p>
-        <div class="certName">{{ $cert->type->name ?? $cert->certification_type }}</div>
-        <div class="verify">
-            <p style="margin:8px 0;">Pour vérifier l'authenticité de ce certificat, visitez</p>
-            <p><b>{{ $website }}</b> ou scannez le QR code.</p>
-        </div>
+      <div class="date-box">
+        <div class="label">Date</div>
+        <div>{{ ($cert->certification_date instanceof \Carbon\Carbon) ? $cert->certification_date->format('d/m/Y') : (is_string($cert->certification_date) ? $cert->certification_date : now()->format('d/m/Y')) }}</div>
     </div>
 
-    <div class="footer">
-        <div class="col">
-            <div class="font-bold">{{ ($cert->certification_date instanceof \Carbon\Carbon) ? $cert->certification_date->format('d-m-Y') : (is_string($cert->certification_date) ? $cert->certification_date : now()->format('d-m-Y')) }}</div>
-            <div class="label">Certification Date</div>
-        </div>
-        <div class="col">
-            <div class="font-bold">{{ $cert->certificate_number ?? $cert->id_number }}</div>
-            <div class="label">ID Number</div>
-        </div>
-        <div class="col">
-            <div class="font-bold" style="font-size:16px;font-style:italic;">{{ $authorized->name }}</div>
-            <div class="label" style="margin-top:6px;">Signature</div>
-            <div style="font-size:10px;">{{ $authorized->phone }}</div>
         </div>
     </div>
 </div>
-
-<div class="no-print" style="text-align:center;">
-    <a href="#" onclick="window.print();return false;" class="btnPrint">Imprimer le certificat</a>
     </div>
+
+
 </body>
 </html>
 

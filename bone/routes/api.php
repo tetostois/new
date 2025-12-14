@@ -16,12 +16,16 @@ use App\Http\Controllers\Api\CertificateController;
 use App\Http\Controllers\Api\Candidate\ProfileController as CandidateProfileController;
 use App\Http\Controllers\Api\Candidate\TermsController as CandidateTermsController;
 use App\Http\Controllers\Api\Admin\SettingsController as AdminSettingsController;
+use App\Http\Controllers\Api\PasswordResetController;
 
 // Routes publiques (sans authentification)
 Route::post('/auth/register', [AuthController::class, 'register']);
 Route::post('/auth/login', [AuthController::class, 'login'])->middleware('throttle:5,1');
 // Renvoyer l'email de vérification (protégé, mais accessible même si non vérifié)
 Route::post('/auth/email/resend', [EmailVerificationController::class, 'resend'])->middleware(['auth:api', 'throttle:6,1']);
+// Mot de passe oublié / réinitialisation
+Route::post('/auth/password/forgot', [PasswordResetController::class, 'forgot'])->middleware('throttle:5,1');
+Route::post('/auth/password/reset', [PasswordResetController::class, 'reset'])->middleware('throttle:10,1');
 
 // Activités récentes (publiques ou protégées selon les besoins)
 Route::get('/activities/recent', [\App\Http\Controllers\Api\ActivityController::class, 'recent']);

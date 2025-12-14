@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, ReactNode, useEffect } from 'react';
 import { User, AuthContextType } from '../types';
 import { API_BASE_URL } from '../config/api';
+import { Input } from '../components/ui/Input';
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
@@ -186,10 +187,16 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     }
   }, []);
 
-  // Détection d'inactivité (5 min) => demande de réauthentification
+  // Détection d'inactivité (5 min) => demande de réauthentification (uniquement si authentifié)
   useEffect(() => {
     let lastActivity = Date.now();
     let timer: number | undefined;
+
+    // Si pas d'utilisateur connecté, ne pas activer la détection et s'assurer que le popup est masqué
+    if (!user) {
+      setRequireReauth(false);
+      return;
+    }
 
     const resetTimer = () => {
       lastActivity = Date.now();
@@ -209,7 +216,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       if (timer) window.clearTimeout(timer);
       events.forEach(evt => window.removeEventListener(evt, resetTimer as any));
     };
-  }, []);
+  }, [user]);
 
   const reauthenticate = async (password: string): Promise<boolean> => {
     if (!user) return false;
@@ -245,7 +252,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   return (
     <AuthContext.Provider value={value}>
       {children}
-      {requireReauth && (
+      {user && requireReauth && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
           <div className="bg-white rounded-lg w-full max-w-sm p-6 shadow-lg">
             <h3 className="text-lg font-semibold mb-4">Session inactive</h3>
@@ -262,13 +269,13 @@ const ReauthForm: React.FC<{ onSubmit: (pwd: string) => void | Promise<void> }> 
   const [pwd, setPwd] = useState('');
   return (
     <form onSubmit={(e) => { e.preventDefault(); onSubmit(pwd); }}>
-      <input
+      <Input
+        label={undefined}
         type="password"
         value={pwd}
         onChange={(e) => setPwd(e.target.value)}
         placeholder="Mot de passe"
-        className="w-full border rounded px-3 py-2 mb-4"
-        autoFocus
+        className="mb-4"
       />
       <button type="submit" className="w-full bg-blue-600 text-white rounded px-3 py-2">Valider</button>
     </form>

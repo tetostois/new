@@ -177,8 +177,8 @@ export const CandidateDashboard: React.FC = () => {
       await apiRequest('/candidate/certification', 'PUT', {
         selected_certification: certification.id
       });
-      setSelectedCertification(certification.id);
-      user.selectedCertification = certification.id;
+    setSelectedCertification(certification.id);
+    user.selectedCertification = certification.id;
       try {
         const saved = localStorage.getItem('user');
         if (saved) {
@@ -191,7 +191,7 @@ export const CandidateDashboard: React.FC = () => {
       alert("Impossible d'enregistrer la certification. Réessayez.");
       return;
     } finally {
-      setShowCertificationSelector(false);
+    setShowCertificationSelector(false);
     }
   };
 

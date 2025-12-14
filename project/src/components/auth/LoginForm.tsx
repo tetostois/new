@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Mail, Lock, AlertCircle } from 'lucide-react';
+import { AlertCircle } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { Input } from '../ui/Input';
 import { Button } from '../ui/Button';
@@ -20,12 +20,6 @@ export const LoginForm: React.FC = () => {
       setError('Email ou mot de passe incorrect');
     }
   };
-
-  const demoAccounts = [
-    { email: 'admin@leadership.com', role: 'Administrateur', password: 'admin123' },
-    { email: 'examiner@leadership.com', role: 'Examinateur', password: 'examiner123' },
-    { email: 'candidate@leadership.com', role: 'Candidat', password: 'candidate123' }
-  ];
 
   return (
     <div className="w-full max-w-md">
@@ -66,27 +60,10 @@ export const LoginForm: React.FC = () => {
           </Button>
         </form>
 
-        <div className="mt-6 pt-6 border-t border-gray-200">
-          <p className="text-sm text-gray-600 mb-3">Comptes de démonstration :</p>
-          <div className="space-y-2">
-            {demoAccounts.map((account, index) => (
-              <div key={index} className="flex justify-between items-center p-2 bg-gray-50 rounded text-xs">
-                <span className="font-medium">{account.role}</span>
-                <span className="text-gray-600">{account.email}</span>
-                <Button
-                  size="sm"
-                  variant="secondary"
-                  onClick={() => {
-                    setEmail(account.email);
-                    setPassword(account.password);
-                  }}
-                >
-                  Utiliser
-                </Button>
-              </div>
-            ))}
-          </div>
+        <div className="mt-4 text-center">
+          <a href="/forgot-password" className="text-sm text-blue-600 hover:underline">Mot de passe oublié ?</a>
         </div>
+
       </Card>
     </div>
   );
