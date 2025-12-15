@@ -135,7 +135,7 @@
       <div class="candidate-underline"></div>
 
       <div class="subtitle-muted" style="margin-top:8mm;">
-        Par sa participation brillante à la certification en tant que Chef d’Entreprise à
+        Par sa participation brillante à la certification en tant que {{ isset($profession) && $profession ? $profession : 'Chef d’Entreprise' }} à
                     </div>
       <div class="cert-text" style="font-weight:700; text-transform:uppercase;">
         {{ mb_strtoupper($cert->type->name ?? $cert->certification_type) }}
@@ -147,15 +147,7 @@
             @endif
         </div>
 
-      <div class="sign-row">
-        <div class="sign-col">
-          <div class="sign-line"></div>
-          <div class="sign-label">Signature autorisée</div>
-        </div>
-        <div class="sign-col">
-          <div class="sign-line"></div>
-          <div class="sign-label">Cachet / Tampon</div>
-        </div>
+      
     </div>
 
       <div class="date-box">

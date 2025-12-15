@@ -3,8 +3,8 @@ import { CertificationType } from "../../types";
 export const certificationTypes: CertificationType[] = [
   {
     id: 'initiation-pratique',
-    name: 'Certification d\'Initiation Pratique Générale',
-    description: 'Acquérir les bases pratiques pour initier un projet entrepreneurial',
+    name: 'Examen National de Leadership et Entrepreneuriat',
+    description: 'Certification Pratique Générale : Acquérir les bases pratiques en Leadership, Entrepreneuriat et Compétences Professionnelles pour initier un projet Entrepreneurial',
     price: 10,
     minScore: 70,
     questionCount: 20,

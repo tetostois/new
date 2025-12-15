@@ -137,6 +137,10 @@ export const CertificationSelector: React.FC<CertificationSelectorProps> = ({
                   {cert.description}
                 </p>
 
+                <div className="text-sm font-medium text-blue-600 mb-2 select-none">
+                  Details &gt;&gt;&gt;
+                </div>
+
                 <div className="flex items-center justify-between mb-4">
                   <div className="text-2xl font-bold text-gray-900">
                     {formatPrice(price)}

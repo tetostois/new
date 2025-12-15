@@ -150,6 +150,7 @@ class CertificateController extends Controller
                 'certification' => $certType,
                 'date' => now()->format('d/m/Y'),
                 'id_number' => 'ID-' . strtoupper($certType) . '-' . $candidateId,
+                'profession' => $candidate->specialization ?? null,
             ];
             $pdf = Pdf::loadView('certificates.certificate', $data)->setPaper('a4', 'landscape');
             $path = 'certificates/' . $candidateId . '-' . $certType . '-' . now()->format('YmdHis') . '.pdf';
@@ -165,11 +166,14 @@ class CertificateController extends Controller
 
     public function download(Request $request, string $candidateId, string $certType)
     {
+        $user = User::find($candidateId);
+        $fallbackName = $user ? (trim(($user->first_name ?? '') . ' ' . ($user->last_name ?? '')) ?: 'Candidat') : 'Candidat';
         $data = [
-            'name' => $request->query('name', 'Candidat'),
+            'name' => $request->query('name', $fallbackName),
             'certification' => $certType,
             'date' => now()->format('d/m/Y'),
             'id_number' => 'ID-' . strtoupper($certType) . '-' . $candidateId,
+            'profession' => $user->specialization ?? null,
         ];
 
         $pdf = Pdf::loadView('certificates.certificate', $data)->setPaper('a4', 'landscape');
@@ -186,20 +190,18 @@ class CertificateController extends Controller
             return response()->json(['success' => false, 'message' => 'Non authentifié.'], 401);
         }
         $candidateId = (string) $auth->id;
-        // Chercher le fichier correspondant
-        $path = collect(Storage::disk('public')->files('certificates'))
-            ->first(function ($f) use ($candidateId, $certType) {
-                return str_starts_with(basename($f), $candidateId . '-' . $certType . '-');
-            });
-        if (!$path || !Storage::disk('public')->exists($path)) {
-            return response()->json(['success' => false, 'message' => 'Certificat introuvable'], 404);
-        }
-        $content = Storage::disk('public')->get($path);
-        $filename = 'certificate-' . $candidateId . '-' . $certType . '.pdf';
-        return response($content, 200, [
-            'Content-Type' => 'application/pdf',
-            'Content-Disposition' => 'attachment; filename="' . $filename . '"'
-        ]);
+        $user = User::find($candidateId);
+        $displayName = $user ? (trim(($user->first_name ?? '') . ' ' . ($user->last_name ?? '')) ?: 'Candidat') : 'Candidat';
+        // Générer à la volée pour éviter d'anciens PDF avec valeurs par défaut
+        $data = [
+            'name' => $displayName,
+            'certification' => $certType,
+            'date' => now()->format('d/m/Y'),
+            'id_number' => 'ID-' . strtoupper($certType) . '-' . $candidateId,
+            'profession' => $user->specialization ?? null,
+        ];
+        $pdf = Pdf::loadView('certificates.certificate', $data)->setPaper('a4', 'landscape');
+        return $pdf->download('certificate-' . $candidateId . '-' . $certType . '.pdf');
     }
 
     /**
@@ -232,6 +234,7 @@ class CertificateController extends Controller
                 'certification' => $certType,
                 'date' => now()->format('d/m/Y'),
                 'id_number' => 'ID-' . strtoupper($certType) . '-' . $candidateId,
+                'profession' => $user->specialization ?? null,
             ];
             $pdf = Pdf::loadView('certificates.certificate', $data)->setPaper('a4', 'landscape');
             $path = 'certificates/' . $candidateId . '-' . $certType . '-' . now()->format('YmdHis') . '.pdf';
